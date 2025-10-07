@@ -99,7 +99,7 @@ public class PlayerManager {
             return;
         }
 
-        event.getChannel().sendMessage("procurando e baixando essa msc lixo q vc mando ae, aguarde one sec lil bro..").queue();
+        event.getChannel().sendMessage("baixando e jogando na fila, one sec lil bro...").queue();
 
         // Usa spotdl para baixar a música completa em uma thread separada
         new Thread(() -> {
@@ -108,7 +108,7 @@ public class PlayerManager {
             String filePath = downloader.downloadTrack(input);
 
             if (filePath == null) {
-                event.getChannel().sendMessage("erro ao baixar musica, fudeo. tenta otrakkk").queue();
+                event.getChannel().sendMessage("cusao tentei 3x baixar essa msc mas deu bidu. pula essa porra ai e manda outra >.<").queue();
                 return;
             }
 
@@ -185,6 +185,7 @@ public class PlayerManager {
 
                 if (filePath == null) {
                     System.err.println("❌ erro ao baixar track #" + trackNumber);
+                    event.getChannel().sendMessage("**X** pulei a track #" + trackNumber + " pq deu erro 3x ao baixar, pfv da proxima sem musicas paraguaias").queue();
                     continue; // Pula para próxima
                 }
 

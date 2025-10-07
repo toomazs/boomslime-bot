@@ -217,7 +217,7 @@ public class CommandManager extends ListenerAdapter {
         long position = currentTrack.getPosition();
         long duration = currentTrack.getDuration();
 
-        embed.addField("ta tocando agora essa porra aq:",
+        embed.addField("▶\uFE0F - ta tocando isso aq:",
                 String.format("**%s** - **%s**\n[%s / %s]",
                         info.title,
                         info.author,
@@ -278,7 +278,7 @@ public class CommandManager extends ListenerAdapter {
 
         String trackName = player.getPlayingTrack().getInfo().title;
         musicManager.getScheduler().nextTrack();
-        channel.sendMessage("⏭ pulandinhooo >///<:").queue();
+        channel.sendMessage("⏭ pulandinhooo >///<").queue();
     }
 
     private void handleRewindCommand(MessageReceivedEvent event) {
@@ -381,7 +381,7 @@ public class CommandManager extends ListenerAdapter {
 
         EmbedBuilder embed = new EmbedBuilder();
         embed.setColor(Color.MAGENTA);
-        embed.setTitle("ta tocando agr saporra ai:");
+        embed.setTitle("▶\uFE0F - ta tocando isso aq:");
         embed.addField("musica bosta:", info.title, false);
         embed.addField("artista merda:", info.author, false);
         embed.addField("progresso (deu mo trampo fazer a barra aq embaixo pprt):", formatTime(position) + " / " + formatTime(duration), false);
@@ -423,7 +423,7 @@ public class CommandManager extends ListenerAdapter {
         }
 
         musicManager.getScheduler().shuffle();
-        channel.sendMessage("fila embaralhada igual cu da sua maekk: " + queue.size() + " musicas").queue();
+        channel.sendMessage("fila embaralhada c sucesso igual a xexeuba da sua maekk, da um !queue ai").queue();
     }
 
     private void handleHelpCommand(MessageReceivedEvent event) {

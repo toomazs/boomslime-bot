@@ -36,20 +36,50 @@ public class SpotifyDownloader {
     /**
      * Baixa uma música do Spotify e retorna o caminho do arquivo
      * Usa cache se a música já foi baixada
+     * Tenta até 3 vezes em caso de erro
      * @param spotifyUrl URL da música no Spotify
      * @return Caminho do arquivo MP3 baixado ou null se falhar
      */
     public String downloadTrack(String spotifyUrl) {
-        try {
-            // Verifica se já existe no cache
-            String cachedFile = checkCache(spotifyUrl);
-            if (cachedFile != null) {
-                System.out.println("✓ usando cache: " + cachedFile);
-                return cachedFile;
+        // Verifica se já existe no cache
+        String cachedFile = checkCache(spotifyUrl);
+        if (cachedFile != null) {
+            System.out.println("✓ usando cache: " + cachedFile);
+            return cachedFile;
+        }
+
+        // Tenta até 3 vezes
+        final int MAX_RETRIES = 3;
+        for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+            System.out.println("baixando com spotdl (tentativa " + attempt + "/" + MAX_RETRIES + "): " + spotifyUrl);
+
+            String result = attemptDownload(spotifyUrl);
+
+            if (result != null) {
+                return result;
             }
 
-            System.out.println("baixando com spotdl: " + spotifyUrl);
+            // Se falhou e não é última tentativa, espera 5 segundos
+            if (attempt < MAX_RETRIES) {
+                System.out.println("aguardando 5s antes de tentar novamente...");
+                try {
+                    Thread.sleep(5000);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        }
 
+        // Falhou após 3 tentativas
+        System.err.println("download falhou apos " + MAX_RETRIES + " tentativas: " + spotifyUrl);
+        return null;
+    }
+
+    /**
+     * Tenta fazer o download uma vez
+     */
+    private String attemptDownload(String spotifyUrl) {
+        try {
             // Constrói o comando spotdl
             ProcessBuilder pb;
             String ffmpegPath = BotConfig.get("FFMPEG_PATH");
@@ -142,44 +172,14 @@ public class SpotifyDownloader {
 
                 if (filesWithId != null && filesWithId.length > 0) {
                     downloadedFile = filesWithId[0].getAbsolutePath();
-                    System.out.println("✓ cache hit: " + downloadedFile);
-                } else {
-                    // Procura arquivo mais recente (recém baixado)
-                    System.out.println("procurando arquivo recém baixado...");
-                    File[] allFiles = downloadDir.toFile().listFiles((dir, name) -> name.endsWith(".mp3"));
-                    if (allFiles != null && allFiles.length > 0) {
-                        File newest = allFiles[0];
-                        for (File f : allFiles) {
-                            if (f.lastModified() > newest.lastModified()) {
-                                newest = f;
-                            }
-                        }
-                        downloadedFile = newest.getAbsolutePath();
-                        System.out.println("✓ novo download: " + downloadedFile);
-                    }
-                }
-            } else {
-                // Fallback: procura o mais recente
-                System.out.println("sem trackId, procurando arquivo mais recente...");
-                File[] files = downloadDir.toFile().listFiles((dir, name) -> name.endsWith(".mp3"));
-                if (files != null && files.length > 0) {
-                    File newest = files[0];
-                    for (File f : files) {
-                        if (f.lastModified() > newest.lastModified()) {
-                            newest = f;
-                        }
-                    }
-                    downloadedFile = newest.getAbsolutePath();
+                    System.out.println("✓ download bem-sucedido: " + downloadedFile);
+                    return downloadedFile;
                 }
             }
 
-            if (downloadedFile != null && Files.exists(Paths.get(downloadedFile))) {
-                System.out.println("musica baixada: " + downloadedFile);
-                return downloadedFile;
-            } else {
-                System.err.println("arquivo nao encontrado apos download");
-                return null;
-            }
+            // Se não encontrou por trackId, procura o mais recente
+            System.err.println("arquivo nao encontrado com trackId, possivelmente o download falhou");
+            return null;
 
         } catch (Exception e) {
             System.err.println("erro ao baixar musica: " + e.getMessage());

@@ -165,11 +165,18 @@ public class TrackScheduler extends AudioEventAdapter {
         this.fadeStarted = false;
         scheduleFadeOut(track);
 
-        // Envia mensagem "tocando agora:"
+        // Envia mensagem "tocando agora:" com delay de 1.5s
         if (textChannel != null) {
-            String artist = track.getInfo().author;
-            String title = track.getInfo().title;
-            textChannel.sendMessage("▶ to tocano agr: **" + artist + " - " + title + "**").queue();
+            Timer msgTimer = new Timer("NowPlayingMessageTimer", true);
+            msgTimer.schedule(new TimerTask() {
+                @Override
+                public void run() {
+                    String artist = track.getInfo().author;
+                    String title = track.getInfo().title;
+                    textChannel.sendMessage("▶ to tocano agr: **" + artist + " - " + title + "**").queue();
+                    msgTimer.cancel();
+                }
+            }, 1500); // 1.5s de delay
         }
     }
 
