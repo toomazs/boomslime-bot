@@ -140,8 +140,8 @@ public class TrackScheduler extends AudioEventAdapter {
      */
     @Override
     public void onTrackEnd(AudioPlayer player, AudioTrack track, AudioTrackEndReason endReason) {
-        // Adiciona a música que acabou ao histórico (com um clone para preservar as informações)
-        if (endReason == AudioTrackEndReason.FINISHED || endReason == AudioTrackEndReason.LOAD_FAILED) {
+        // SEMPRE adiciona ao histórico (independente do motivo), exceto se foi STOPPED manualmente
+        if (endReason != AudioTrackEndReason.STOPPED && endReason != AudioTrackEndReason.CLEANUP) {
             // Mantém apenas as últimas 50 músicas no histórico
             if (history.size() >= 50) {
                 history.remove(0);
