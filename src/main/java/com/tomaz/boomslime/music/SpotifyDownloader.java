@@ -48,7 +48,7 @@ public class SpotifyDownloader {
             return cachedFile;
         }
 
-        // Tenta até 3 vezes
+        // Tenta até 3 vezes com backoff exponencial
         final int MAX_RETRIES = 3;
         for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
             System.out.println("baixando com spotdl (tentativa " + attempt + "/" + MAX_RETRIES + "): " + spotifyUrl);
@@ -59,11 +59,12 @@ public class SpotifyDownloader {
                 return result;
             }
 
-            // Se falhou e não é última tentativa, espera 5 segundos
+            // Backoff exponencial: 10s, 20s, 30s (evita rate limit)
             if (attempt < MAX_RETRIES) {
-                System.out.println("aguardando 5s antes de tentar novamente...");
+                int waitTime = attempt * 10;
+                System.out.println("aguardando " + waitTime + "s antes de tentar novamente...");
                 try {
-                    Thread.sleep(5000);
+                    Thread.sleep(waitTime * 1000L);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                 }
@@ -79,6 +80,14 @@ public class SpotifyDownloader {
      * Tenta fazer o download uma vez
      */
     private String attemptDownload(String spotifyUrl) {
+        try {
+            // Delay aleatório de 1-3s para evitar detecção de bot
+            int randomDelay = 1000 + (int)(Math.random() * 2000);
+            Thread.sleep(randomDelay);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+
         try {
             // Constrói o comando spotdl
             ProcessBuilder pb;
@@ -100,9 +109,15 @@ public class SpotifyDownloader {
                         "--ffmpeg", ffmpegPath,
                         "--format", "mp3",
                         "--bitrate", "96k",
-                        "--threads", "8",
+                        "--threads", "4",  // Reduzido para evitar rate limit
                         "--output", outputPattern,
-                        "--print-errors"
+                        "--print-errors",
+                        // Opções para bypass de bloqueios do YouTube
+                        "--cookie-file", "/dev/null",  // Evita problemas com cookies
+                        "--restrict-filenames",        // Evita caracteres especiais
+                        "--no-cache-dir",             // Não usa cache
+                        "--ytm-data",                 // Força usar YouTube Music API
+                        "--yt-dlp-args", "--extractor-args youtube:player_client=android,web"
                 );
             } else {
                 // Caso contrário, deixa spotdl usar o ffmpeg do sistema
@@ -112,9 +127,15 @@ public class SpotifyDownloader {
                         spotifyUrl,  // URL primeiro
                         "--format", "mp3",
                         "--bitrate", "96k",
-                        "--threads", "8",
+                        "--threads", "4",  // Reduzido para evitar rate limit
                         "--output", outputPattern,
-                        "--print-errors"
+                        "--print-errors",
+                        // Opções para bypass de bloqueios do YouTube
+                        "--cookie-file", "/dev/null",  // Evita problemas com cookies
+                        "--restrict-filenames",        // Evita caracteres especiais
+                        "--no-cache-dir",             // Não usa cache
+                        "--ytm-data",                 // Força usar YouTube Music API
+                        "--yt-dlp-args", "--extractor-args youtube:player_client=android,web"
                 );
             }
 

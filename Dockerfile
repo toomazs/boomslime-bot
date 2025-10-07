@@ -15,9 +15,12 @@ RUN apt-get update && \
 
 # Instala versões específicas e atualizadas do spotdl e yt-dlp
 # yt-dlp precisa ser sempre a versão mais recente para funcionar
+# CRÍTICO: YouTube muda APIs frequentemente, yt-dlp precisa estar atualizado
 RUN pip3 install --no-cache-dir --upgrade pip && \
-    pip3 install --no-cache-dir --upgrade yt-dlp && \
-    pip3 install --no-cache-dir spotdl
+    pip3 install --no-cache-dir --force-reinstall --upgrade yt-dlp && \
+    pip3 install --no-cache-dir --upgrade spotdl && \
+    yt-dlp --version && \
+    spotdl --version
 
 WORKDIR /app
 
