@@ -10,6 +10,7 @@ import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.entities.GuildVoiceState;
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.channel.middleman.MessageChannel;
+import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 
@@ -20,6 +21,88 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 public class CommandManager extends ListenerAdapter {
+
+    @Override
+    public void onButtonInteraction(ButtonInteractionEvent event) {
+        String buttonId = event.getComponentId();
+
+        if (buttonId.startsWith("queue_")) {
+            GuildMusicManager musicManager = PlayerManager.getInstance().getMusicManager(event.getGuild());
+            AudioPlayer player = musicManager.getAudioPlayer();
+            AudioTrack currentTrack = player.getPlayingTrack();
+
+            if (currentTrack == null) {
+                event.reply("tem nada tocando, chefe").setEphemeral(true).queue();
+                return;
+            }
+
+            List<AudioTrack> queue = musicManager.getScheduler().getQueue();
+            int page = Integer.parseInt(buttonId.substring(buttonId.lastIndexOf("_") + 1));
+
+            // Atualiza a mensagem com a nova página
+            updateQueuePage(event, currentTrack, queue, page);
+        }
+    }
+
+    private void updateQueuePage(ButtonInteractionEvent event, AudioTrack currentTrack, List<AudioTrack> queue, int page) {
+        final int TRACKS_PER_PAGE = 10;
+        int totalPages = (int) Math.ceil((double) queue.size() / TRACKS_PER_PAGE);
+
+        if (totalPages == 0) totalPages = 1;
+        if (page < 0) page = 0;
+        if (page >= totalPages) page = totalPages - 1;
+
+        EmbedBuilder embed = new EmbedBuilder();
+        embed.setColor(Color.MAGENTA);
+        embed.setTitle("\uD83C\uDFB5 - fila atual");
+
+        // Música atual
+        AudioTrackInfo info = currentTrack.getInfo();
+        long position = currentTrack.getPosition();
+        long duration = currentTrack.getDuration();
+
+        embed.addField("▶\uFE0F - ta tocando isso aq:",
+                String.format("**%s** - **%s**\n[%s / %s]",
+                        info.title,
+                        info.author,
+                        formatTime(position),
+                        formatTime(duration)),
+                false);
+
+        // Próximas músicas
+        if (queue.isEmpty()) {
+            embed.addField("proximas a toca nessa porra:", "fila ta vazia chefe", false);
+        } else {
+            StringBuilder queueString = new StringBuilder();
+            int start = page * TRACKS_PER_PAGE;
+            int end = Math.min(start + TRACKS_PER_PAGE, queue.size());
+
+            for (int i = start; i < end; i++) {
+                AudioTrack track = queue.get(i);
+                queueString.append(String.format("%d. **%s** - **%s** [%s]\n",
+                        i + 1,
+                        track.getInfo().title,
+                        track.getInfo().author,
+                        formatTime(track.getDuration())));
+            }
+
+            embed.addField("proximas (" + queue.size() + ") - pagina " + (page + 1) + "/" + totalPages,
+                          queueString.toString(), false);
+        }
+
+        // Botões de navegação
+        net.dv8tion.jda.api.interactions.components.buttons.Button prevButton =
+            net.dv8tion.jda.api.interactions.components.buttons.Button.secondary("queue_prev_" + (page - 1), "<<<")
+                .withDisabled(page == 0);
+
+        net.dv8tion.jda.api.interactions.components.buttons.Button nextButton =
+            net.dv8tion.jda.api.interactions.components.buttons.Button.secondary("queue_next_" + (page + 1), ">>>")
+                .withDisabled(page >= totalPages - 1 || queue.isEmpty());
+
+        event.editMessageEmbeds(embed.build())
+            .setActionRow(prevButton, nextButton)
+            .queue();
+    }
 
     @Override
     public void onMessageReceived(MessageReceivedEvent event) {
@@ -66,6 +149,10 @@ public class CommandManager extends ListenerAdapter {
                 case "np":
                     handleNowPlayingCommand(event);
                     break;
+                case "shuffle":
+                case "embaralhar":
+                    handleShuffleCommand(event);
+                    break;
                 case "help":
                 case "ajuda":
                     handleHelpCommand(event);
@@ -81,13 +168,13 @@ public class CommandManager extends ListenerAdapter {
         MessageChannel channel = event.getChannel();
 
         if (args.length < 2) {
-            channel.sendMessage("uso: !play <url do spotify>").queue();
+            channel.sendMessage("usa direito fdp burro: !play <url do spotify>").queue();
             return;
         }
 
         // Verifica se o usuário está em um canal de voz
         if (event.getMember() == null || event.getMember().getVoiceState() == null || !event.getMember().getVoiceState().inAudioChannel()) {
-            channel.sendMessage("voce precisa estar em um canal de voz").queue();
+            channel.sendMessage("precisa ta em um canal de voz ne o imbecil").queue();
             return;
         }
 
@@ -103,22 +190,34 @@ public class CommandManager extends ListenerAdapter {
         AudioTrack currentTrack = player.getPlayingTrack();
 
         if (currentTrack == null) {
-            channel.sendMessage("nada tocando no momento").queue();
+            channel.sendMessage("tem nada tocando, chefe").queue();
             return;
         }
 
         List<AudioTrack> queue = musicManager.getScheduler().getQueue();
 
+        // Envia a primeira página (página 0)
+        sendQueuePage(event, currentTrack, queue, 0);
+    }
+
+    private void sendQueuePage(MessageReceivedEvent event, AudioTrack currentTrack, List<AudioTrack> queue, int page) {
+        final int TRACKS_PER_PAGE = 10;
+        int totalPages = (int) Math.ceil((double) queue.size() / TRACKS_PER_PAGE);
+
+        if (totalPages == 0) totalPages = 1; // Pelo menos 1 página
+        if (page < 0) page = 0;
+        if (page >= totalPages) page = totalPages - 1;
+
         EmbedBuilder embed = new EmbedBuilder();
-        embed.setColor(Color.CYAN);
-        embed.setTitle("🎵 fila");
+        embed.setColor(Color.MAGENTA);
+        embed.setTitle("\uD83C\uDFB5 - fila atual");
 
         // Música atual
         AudioTrackInfo info = currentTrack.getInfo();
         long position = currentTrack.getPosition();
         long duration = currentTrack.getDuration();
 
-        embed.addField("tocando agora",
+        embed.addField("ta tocando agora essa porra aq:",
                 String.format("**%s** - **%s**\n[%s / %s]",
                         info.title,
                         info.author,
@@ -128,12 +227,13 @@ public class CommandManager extends ListenerAdapter {
 
         // Próximas músicas
         if (queue.isEmpty()) {
-            embed.addField("proximas", "fila vazia", false);
+            embed.addField("proximas a toca nessa porra:", "fila ta vazia chefe", false);
         } else {
             StringBuilder queueString = new StringBuilder();
-            int count = Math.min(queue.size(), 10); // Mostra até 10 músicas
+            int start = page * TRACKS_PER_PAGE;
+            int end = Math.min(start + TRACKS_PER_PAGE, queue.size());
 
-            for (int i = 0; i < count; i++) {
+            for (int i = start; i < end; i++) {
                 AudioTrack track = queue.get(i);
                 queueString.append(String.format("%d. **%s** - **%s** [%s]\n",
                         i + 1,
@@ -142,21 +242,29 @@ public class CommandManager extends ListenerAdapter {
                         formatTime(track.getDuration())));
             }
 
-            if (queue.size() > 10) {
-                queueString.append(String.format("\n... e mais %d musica(s)", queue.size() - 10));
-            }
-
-            embed.addField("proximas (" + queue.size() + ")", queueString.toString(), false);
+            embed.addField("proximas (" + queue.size() + ") - pagina " + (page + 1) + "/" + totalPages,
+                          queueString.toString(), false);
         }
 
-        channel.sendMessageEmbeds(embed.build()).queue();
+        // Botões de navegação
+        net.dv8tion.jda.api.interactions.components.buttons.Button prevButton =
+            net.dv8tion.jda.api.interactions.components.buttons.Button.secondary("queue_prev_" + (page - 1), "<<<")
+                .withDisabled(page == 0);
+
+        net.dv8tion.jda.api.interactions.components.buttons.Button nextButton =
+            net.dv8tion.jda.api.interactions.components.buttons.Button.secondary("queue_next_" + (page + 1), ">>>")
+                .withDisabled(page >= totalPages - 1 || queue.isEmpty());
+
+        event.getChannel().sendMessageEmbeds(embed.build())
+            .setActionRow(prevButton, nextButton)
+            .queue();
     }
 
     private void handleSkipCommand(MessageReceivedEvent event) {
         MessageChannel channel = event.getChannel();
 
         if (!isUserInVoiceChannel(event)) {
-            channel.sendMessage("precisa estar no canal de voz").queue();
+            channel.sendMessage("precisa ta numa call, seu fdp burro").queue();
             return;
         }
 
@@ -164,20 +272,20 @@ public class CommandManager extends ListenerAdapter {
         AudioPlayer player = musicManager.getAudioPlayer();
 
         if (player.getPlayingTrack() == null) {
-            channel.sendMessage("nada tocando").queue();
+            channel.sendMessage("tem nada tocando, chefe").queue();
             return;
         }
 
         String trackName = player.getPlayingTrack().getInfo().title;
         musicManager.getScheduler().nextTrack();
-        channel.sendMessage("⏭ pulando: **" + trackName + "**").queue();
+        channel.sendMessage("⏭ pulandinhooo >///<:").queue();
     }
 
     private void handleRewindCommand(MessageReceivedEvent event) {
         MessageChannel channel = event.getChannel();
 
         if (!isUserInVoiceChannel(event)) {
-            channel.sendMessage("precisa estar no canal de voz").queue();
+            channel.sendMessage("entra em uma call antes seu inutil").queue();
             return;
         }
 
@@ -186,9 +294,9 @@ public class CommandManager extends ListenerAdapter {
         boolean success = musicManager.getScheduler().rewind();
 
         if (success) {
-            channel.sendMessage("⏮ voltando para a anterior").queue();
+            channel.sendMessage("⏮ voltandinhooo >///<").queue();
         } else {
-            channel.sendMessage("sem historico").queue();
+            channel.sendMessage("sem historico dog").queue();
         }
     }
 
@@ -196,7 +304,7 @@ public class CommandManager extends ListenerAdapter {
         MessageChannel channel = event.getChannel();
 
         if (!isUserInVoiceChannel(event)) {
-            channel.sendMessage("precisa estar no canal de voz").queue();
+            channel.sendMessage("crlh entra numa call primeiro porra").queue();
             return;
         }
 
@@ -204,24 +312,24 @@ public class CommandManager extends ListenerAdapter {
         AudioPlayer player = musicManager.getAudioPlayer();
 
         if (player.getPlayingTrack() == null) {
-            channel.sendMessage("nada tocando").queue();
+            channel.sendMessage("tem nada tocando, chefe").queue();
             return;
         }
 
         if (player.isPaused()) {
-            channel.sendMessage("ja pausado").queue();
+            channel.sendMessage("ja ta pausado fdp").queue();
             return;
         }
 
         player.setPaused(true);
-        channel.sendMessage("⏸ pausado").queue();
+        channel.sendMessage("⏸ pausadinho >///<").queue();
     }
 
     private void handleResumeCommand(MessageReceivedEvent event) {
         MessageChannel channel = event.getChannel();
 
         if (!isUserInVoiceChannel(event)) {
-            channel.sendMessage("precisa estar no canal de voz").queue();
+            channel.sendMessage("entra em uma call antes pfv inergumeno").queue();
             return;
         }
 
@@ -229,31 +337,31 @@ public class CommandManager extends ListenerAdapter {
         AudioPlayer player = musicManager.getAudioPlayer();
 
         if (player.getPlayingTrack() == null) {
-            channel.sendMessage("nada tocando").queue();
+            channel.sendMessage("tem nada tocando, chefe").queue();
             return;
         }
 
         if (!player.isPaused()) {
-            channel.sendMessage("ja tocando").queue();
+            channel.sendMessage("ja ta tocando msc o leproso").queue();
             return;
         }
 
         player.setPaused(false);
-        channel.sendMessage("▶ retomado").queue();
+        channel.sendMessage("▶ retomadinho >///<").queue();
     }
 
     private void handleStopCommand(MessageReceivedEvent event) {
         MessageChannel channel = event.getChannel();
 
         if (!isUserInVoiceChannel(event)) {
-            channel.sendMessage("precisa estar no canal de voz").queue();
+            channel.sendMessage("precisa ta em call antes ne o idiota").queue();
             return;
         }
 
         GuildMusicManager musicManager = PlayerManager.getInstance().getMusicManager(event.getGuild());
         musicManager.getScheduler().stop();
         event.getGuild().getAudioManager().closeAudioConnection();
-        channel.sendMessage("⏹ parado, fila limpa").queue();
+        channel.sendMessage("■ paradinho >///<").queue();
     }
 
     private void handleNowPlayingCommand(MessageReceivedEvent event) {
@@ -263,7 +371,7 @@ public class CommandManager extends ListenerAdapter {
         AudioTrack track = player.getPlayingTrack();
 
         if (track == null) {
-            channel.sendMessage("❌ Não há nada tocando no momento!").queue();
+            channel.sendMessage("tem nada tocando, chefe").queue();
             return;
         }
 
@@ -272,11 +380,11 @@ public class CommandManager extends ListenerAdapter {
         long duration = track.getDuration();
 
         EmbedBuilder embed = new EmbedBuilder();
-        embed.setColor(Color.GREEN);
-        embed.setTitle("🎵 Tocando Agora");
-        embed.addField("Música", info.title, false);
-        embed.addField("Artista", info.author, false);
-        embed.addField("Progresso", formatTime(position) + " / " + formatTime(duration), false);
+        embed.setColor(Color.MAGENTA);
+        embed.setTitle("ta tocando agr saporra ai:");
+        embed.addField("musica bosta:", info.title, false);
+        embed.addField("artista merda:", info.author, false);
+        embed.addField("progresso (deu mo trampo fazer a barra aq embaixo pprt):", formatTime(position) + " / " + formatTime(duration), false);
 
         // Barra de progresso
         int progressBarLength = 20;
@@ -292,10 +400,30 @@ public class CommandManager extends ListenerAdapter {
         embed.addField("", progressBar.toString(), false);
 
         if (player.isPaused()) {
-            embed.setFooter("⏸️ Pausado");
+            embed.setFooter("⏸ pausadinho >///<");
         }
 
         channel.sendMessageEmbeds(embed.build()).queue();
+    }
+
+    private void handleShuffleCommand(MessageReceivedEvent event) {
+        MessageChannel channel = event.getChannel();
+
+        if (!isUserInVoiceChannel(event)) {
+            channel.sendMessage("precisa ta em canal de voz antes arrombado").queue();
+            return;
+        }
+
+        GuildMusicManager musicManager = PlayerManager.getInstance().getMusicManager(event.getGuild());
+        List<AudioTrack> queue = musicManager.getScheduler().getQueue();
+
+        if (queue.isEmpty()) {
+            channel.sendMessage("fila ta vazia chefe").queue();
+            return;
+        }
+
+        musicManager.getScheduler().shuffle();
+        channel.sendMessage("fila embaralhada igual cu da sua maekk: " + queue.size() + " musicas").queue();
     }
 
     private void handleHelpCommand(MessageReceivedEvent event) {
@@ -303,21 +431,19 @@ public class CommandManager extends ListenerAdapter {
         String prefix = BotConfig.get("PREFIX", "!");
 
         EmbedBuilder embed = new EmbedBuilder();
-        embed.setColor(Color.ORANGE);
-        embed.setTitle("🎵 Comandos do Boomslime Bot");
-        embed.setDescription("Aqui estão todos os comandos disponíveis:");
+        embed.setColor(Color.MAGENTA);
+        embed.setTitle("\uD83D\uDEAE - comandos desse bot horrivel:");
 
-        embed.addField(prefix + "play <música/url>", "Toca uma música (Spotify, YouTube ou busca por nome)", false);
-        embed.addField(prefix + "queue", "Mostra a fila de músicas", false);
-        embed.addField(prefix + "skip", "Pula a música atual", false);
-        embed.addField(prefix + "rewind", "Volta para a música anterior", false);
-        embed.addField(prefix + "pause", "Pausa a música atual", false);
-        embed.addField(prefix + "resume", "Retoma a música pausada", false);
-        embed.addField(prefix + "stop", "Para o player e limpa a fila", false);
-        embed.addField(prefix + "nowplaying", "Mostra informações da música atual", false);
-        embed.addField(prefix + "help", "Mostra esta mensagem de ajuda", false);
-
-        embed.setFooter("Boomslime Bot - Seu DJ favorito! 🎶");
+        embed.addField(prefix + "play <url-spotify>", "toca musica ou playlist spotify (bruh)", false);
+        embed.addField(prefix + "queue", ",ostra a fila de músicas", false);
+        embed.addField(prefix + "skip", "pula a música atual", false);
+        embed.addField(prefix + "rewind", "volta para a música anterior", false);
+        embed.addField(prefix + "pause", "pausa a música atual", false);
+        embed.addField(prefix + "resume", "retoma a música pausada", false);
+        embed.addField(prefix + "shuffle", "embaralha a fila de músicas", false);
+        embed.addField(prefix + "stop", "para o player e limpa a fila", false);
+        embed.addField(prefix + "nowplaying", "mostra informações da música atual", false);
+        embed.addField(prefix + "help", "mostra essa mensagem de ajuda", false);
 
         channel.sendMessageEmbeds(embed.build()).queue();
     }

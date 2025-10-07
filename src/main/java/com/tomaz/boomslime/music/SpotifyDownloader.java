@@ -4,6 +4,8 @@ import com.tomaz.boomslime.config.BotConfig;
 
 import java.io.*;
 import java.nio.file.*;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -187,7 +189,7 @@ public class SpotifyDownloader {
     }
 
     /**
-     * Limpa arquivos antigos do diretório de downloads
+     * Limpa arquivos antigos do diretório de downloads (mais de 24h)
      */
     public void cleanupOldFiles() {
         try {
@@ -197,8 +199,9 @@ public class SpotifyDownloader {
                 int deleted = 0;
 
                 for (File file : files) {
-                    // Deleta arquivos com mais de 1 hora
-                    if (now - file.lastModified() > 3600000) {
+                    // Deleta arquivos com mais de 24 horas
+                    long fileAge = now - file.lastModified();
+                    if (fileAge > 86400000) { // 24h em ms
                         if (file.delete()) {
                             deleted++;
                         }
@@ -206,12 +209,30 @@ public class SpotifyDownloader {
                 }
 
                 if (deleted > 0) {
-                    System.out.println("limpou " + deleted + " arquivos antigos");
+                    System.out.println("auto-limpeza: removeu " + deleted + " arquivos com +24h");
                 }
             }
         } catch (Exception e) {
             System.err.println("erro ao limpar arquivos: " + e.getMessage());
         }
+    }
+
+    /**
+     * Inicia timer de auto-limpeza que roda a cada 6 horas
+     */
+    public void startAutoCleanup() {
+        Timer cleanupTimer = new Timer("AutoCleanup", true);
+
+        // Roda a cada 6 horas (21600000 ms)
+        cleanupTimer.scheduleAtFixedRate(new TimerTask() {
+            @Override
+            public void run() {
+                System.out.println("executando auto-limpeza...");
+                cleanupOldFiles();
+            }
+        }, 0, 21600000); // Primeira execução imediata, depois a cada 6h
+
+        System.out.println("auto-limpeza iniciada (arquivos +24h serao removidos a cada 6h)");
     }
 
     public Path getDownloadDir() {

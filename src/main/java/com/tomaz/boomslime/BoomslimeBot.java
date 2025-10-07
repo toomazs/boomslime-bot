@@ -17,14 +17,11 @@ public class BoomslimeBot {
             return;
         }
 
-        // Adiciona hook para limpar a pasta music/ ao parar o bot (Ctrl+C)
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            System.out.println("\n🛑 Parando bot...");
-            SpotifyDownloader.getInstance().cleanupAllFiles();
-        }));
+        // Inicia auto-limpeza de arquivos antigos (24h)
+        SpotifyDownloader.getInstance().startAutoCleanup();
 
         JDA jda = JDABuilder.createDefault(token)
-                .setActivity(Activity.listening("!help para ver comandos"))
+                .setActivity(Activity.listening("vozes da minha cabeca"))
                 .enableIntents(
                         GatewayIntent.GUILD_MESSAGES,
                         GatewayIntent.GUILD_VOICE_STATES,

@@ -4,6 +4,7 @@ import com.sedmelluq.discord.lavaplayer.player.AudioPlayer;
 import com.sedmelluq.discord.lavaplayer.player.event.AudioEventAdapter;
 import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
 import com.sedmelluq.discord.lavaplayer.track.AudioTrackEndReason;
+import net.dv8tion.jda.api.entities.channel.middleman.MessageChannel;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -22,6 +23,7 @@ public class TrackScheduler extends AudioEventAdapter {
     private final BlockingQueue<AudioTrack> queue;
     private final List<AudioTrack> history; // Histórico de músicas tocadas
     private AudioTrack lastTrack; // Última música que tocou
+    private MessageChannel textChannel; // Canal para enviar mensagens
 
     // Fade-out simples
     private static final long FADE_DURATION = 3000; // 3 segundos em ms
@@ -36,6 +38,13 @@ public class TrackScheduler extends AudioEventAdapter {
         this.queue = new LinkedBlockingQueue<>();
         this.history = new ArrayList<>();
         this.fadeTimer = new Timer("FadeTimer", true);
+    }
+
+    /**
+     * Define o canal de texto para enviar mensagens.
+     */
+    public void setTextChannel(MessageChannel channel) {
+        this.textChannel = channel;
     }
 
     /**
@@ -117,6 +126,16 @@ public class TrackScheduler extends AudioEventAdapter {
     }
 
     /**
+     * Embaralha a fila de músicas.
+     */
+    public void shuffle() {
+        List<AudioTrack> tracks = new ArrayList<>(queue);
+        Collections.shuffle(tracks);
+        queue.clear();
+        queue.addAll(tracks);
+    }
+
+    /**
      * Chamado pelo Lavaplayer quando uma faixa termina de tocar.
      */
     @Override
@@ -145,6 +164,13 @@ public class TrackScheduler extends AudioEventAdapter {
         this.lastTrack = track;
         this.fadeStarted = false;
         scheduleFadeOut(track);
+
+        // Envia mensagem "tocando agora:"
+        if (textChannel != null) {
+            String artist = track.getInfo().author;
+            String title = track.getInfo().title;
+            textChannel.sendMessage("▶ to tocano agr: **" + artist + " - " + title + "**").queue();
+        }
     }
 
     /**

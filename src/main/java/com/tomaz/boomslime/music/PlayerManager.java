@@ -63,14 +63,14 @@ public class PlayerManager {
         Member member = event.getMember();
 
         if (member == null) {
-            event.getChannel().sendMessage("erro ao identificar usuario").queue();
+            event.getChannel().sendMessage("deu bidu ao identificar user, da um slv no dodis pprt").queue();
             return;
         }
 
         GuildVoiceState voiceState = member.getVoiceState();
 
         if (voiceState == null || !voiceState.inAudioChannel()) {
-            event.getChannel().sendMessage("voce precisa estar em um canal de voz").queue();
+            event.getChannel().sendMessage("entra em uma call antes fdppppppp").queue();
             return;
         }
 
@@ -82,11 +82,14 @@ public class PlayerManager {
             audioManager.openAudioConnection(audioChannel);
         }
 
+        // Define o canal de texto para mensagens
+        musicManager.setTextChannel(event.getChannel());
+
         // Verifica se é URL do Spotify
         SpotifyService spotifyService = SpotifyService.getInstance();
 
         if (!spotifyService.isSpotifyUrl(input)) {
-            event.getChannel().sendMessage("por enquanto apenas links do spotify funcionam").queue();
+            event.getChannel().sendMessage("por enquanto apenas links do spotify funcionam, cobra o dodis").queue();
             return;
         }
 
@@ -96,7 +99,7 @@ public class PlayerManager {
             return;
         }
 
-        event.getChannel().sendMessage("🔍 procurando e baixando musica... (pode demorar ~20s)").queue();
+        event.getChannel().sendMessage("procurando e baixando essa msc lixo q vc mando ae, aguarde one sec lil bro..").queue();
 
         // Usa spotdl para baixar a música completa em uma thread separada
         new Thread(() -> {
@@ -105,7 +108,7 @@ public class PlayerManager {
             String filePath = downloader.downloadTrack(input);
 
             if (filePath == null) {
-                event.getChannel().sendMessage("❌ erro ao baixar musica").queue();
+                event.getChannel().sendMessage("erro ao baixar musica, fudeo. tenta otrakkk").queue();
                 return;
             }
 
@@ -122,9 +125,7 @@ public class PlayerManager {
                 musicManager.getScheduler().queue(track);
 
                 if (isPlaying) {
-                    event.getChannel().sendMessage("✓ " + trackInfo + " foi adicionado a fila").queue();
-                } else {
-                    event.getChannel().sendMessage("▶ tocando: " + trackInfo).queue();
+                    event.getChannel().sendMessage("✓ " + trackInfo + " foi adicionado a fila com sucesso, chefe").queue();
                 }
             }
 
@@ -132,10 +133,10 @@ public class PlayerManager {
             public void playlistLoaded(AudioPlaylist playlist) {
                 if (playlist.isSearchResult()) {
                     AudioTrack firstTrack = playlist.getTracks().get(0);
-                    event.getChannel().sendMessage("tocando: " + firstTrack.getInfo().title + " - " + firstTrack.getInfo().author).queue();
+                    event.getChannel().sendMessage("▶ to tocano agr: **" + firstTrack.getInfo().title + " - " + firstTrack.getInfo().author + "**").queue();
                     musicManager.getScheduler().queue(firstTrack);
                 } else {
-                    event.getChannel().sendMessage("playlist adicionada: " + playlist.getName() + " (" + playlist.getTracks().size() + " musicas)").queue();
+                    event.getChannel().sendMessage("playlist adicionada c sucesso xD: " + playlist.getName() + " (" + playlist.getTracks().size() + " musicas)").queue();
                     for (AudioTrack track : playlist.getTracks()) {
                         musicManager.getScheduler().queue(track);
                     }
@@ -144,35 +145,32 @@ public class PlayerManager {
 
             @Override
             public void noMatches() {
-                event.getChannel().sendMessage("nao encontrei a musica").queue();
+                event.getChannel().sendMessage("nao encontrei a musica dog, taca msc de gente aew").queue();
             }
 
             @Override
             public void loadFailed(FriendlyException exception) {
-                event.getChannel().sendMessage("erro ao tocar: " + exception.getMessage()).queue();
+                event.getChannel().sendMessage("erro ao tocar sa porra, pede pro dodis debuggar: " + exception.getMessage()).queue();
                 exception.printStackTrace(); // Debug
             }
         });
-
-            // Limpa arquivos antigos após adicionar à fila
-            downloader.cleanupOldFiles();
         }).start();
     }
 
     // Carrega e toca uma playlist completa do Spotify
     private void loadPlaylist(MessageReceivedEvent event, String playlistUrl, GuildMusicManager musicManager) {
-        event.getChannel().sendMessage("📋 carregando playlist...").queue();
+        event.getChannel().sendMessage("carregando playlist veia podi...").queue();
 
         new Thread(() -> {
             SpotifyService spotifyService = SpotifyService.getInstance();
             List<String> trackUrls = spotifyService.getPlaylistTracks(playlistUrl);
 
             if (trackUrls.isEmpty()) {
-                event.getChannel().sendMessage("❌ playlist vazia ou erro ao carregar").queue();
+                event.getChannel().sendMessage("playlist ou eh privada, ou ta vazia ou deu bidu .-.").queue();
                 return;
             }
 
-            event.getChannel().sendMessage("✓ " + trackUrls.size() + " musicas encontradas").queue();
+            event.getChannel().sendMessage(trackUrls.size() + " musicas bosta encontradas, aguarda ai q to baxano").queue();
 
             // CRÍTICO: Processa SEQUENCIALMENTE para manter ordem
             for (int i = 0; i < trackUrls.size(); i++) {
@@ -195,10 +193,6 @@ public class PlayerManager {
                     @Override
                     public void trackLoaded(AudioTrack track) {
                         musicManager.getScheduler().queue(track);
-
-                        if (trackNumber == 1) {
-                            event.getChannel().sendMessage("▶ tocando primeira musica, baixando resto...").queue();
-                        }
 
                         System.out.println("✓ [" + trackNumber + "/" + totalTracks + "] " + track.getInfo().title);
                     }
@@ -229,7 +223,7 @@ public class PlayerManager {
                 }
             }
 
-            event.getChannel().sendMessage("✅ playlist completa! " + trackUrls.size() + " musicas enfileiradas").queue();
+            event.getChannel().sendMessage("playlist completa >///<: " + trackUrls.size() + " musicas enfileiradas").queue();
         }).start();
     }
 }
