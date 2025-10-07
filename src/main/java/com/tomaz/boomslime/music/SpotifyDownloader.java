@@ -105,37 +105,33 @@ public class SpotifyDownloader {
                 pb = new ProcessBuilder(
                         "spotdl",
                         "download",
-                        spotifyUrl,  // URL primeiro
+                        spotifyUrl,
                         "--ffmpeg", ffmpegPath,
                         "--format", "mp3",
                         "--bitrate", "96k",
-                        "--threads", "4",  // Reduzido para evitar rate limit
+                        "--threads", "4",
                         "--output", outputPattern,
                         "--print-errors",
-                        // Opções para bypass de bloqueios do YouTube
-                        "--cookie-file", "/dev/null",  // Evita problemas com cookies
-                        "--restrict-filenames",        // Evita caracteres especiais
-                        "--no-cache-dir",             // Não usa cache
-                        "--ytm-data",                 // Força usar YouTube Music API
-                        "--yt-dlp-args", "--extractor-args youtube:player_client=android,web"
+                        "--restrict", "none",  // Não restringe caracteres nos nomes
+                        "--no-cache",          // Não usa cache (opção correta do spotdl)
+                        "--ytm-data",          // Força usar YouTube Music API
+                        "--yt-dlp-args", "--extractor-args youtube:player_client=android,web --no-check-certificate"
                 );
             } else {
                 // Caso contrário, deixa spotdl usar o ffmpeg do sistema
                 pb = new ProcessBuilder(
                         "spotdl",
                         "download",
-                        spotifyUrl,  // URL primeiro
+                        spotifyUrl,
                         "--format", "mp3",
                         "--bitrate", "96k",
-                        "--threads", "4",  // Reduzido para evitar rate limit
+                        "--threads", "4",
                         "--output", outputPattern,
                         "--print-errors",
-                        // Opções para bypass de bloqueios do YouTube
-                        "--cookie-file", "/dev/null",  // Evita problemas com cookies
-                        "--restrict-filenames",        // Evita caracteres especiais
-                        "--no-cache-dir",             // Não usa cache
-                        "--ytm-data",                 // Força usar YouTube Music API
-                        "--yt-dlp-args", "--extractor-args youtube:player_client=android,web"
+                        "--restrict", "none",  // Não restringe caracteres nos nomes
+                        "--no-cache",          // Não usa cache (opção correta do spotdl)
+                        "--ytm-data",          // Força usar YouTube Music API
+                        "--yt-dlp-args", "--extractor-args youtube:player_client=android,web --no-check-certificate"
                 );
             }
 
