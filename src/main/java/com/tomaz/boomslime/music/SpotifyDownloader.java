@@ -33,23 +33,57 @@ public class SpotifyDownloader {
 
     /**
      * Baixa uma música do Spotify e retorna o caminho do arquivo
+     * Usa cache se a música já foi baixada
      * @param spotifyUrl URL da música no Spotify
      * @return Caminho do arquivo MP3 baixado ou null se falhar
      */
     public String downloadTrack(String spotifyUrl) {
         try {
+            // Verifica se já existe no cache
+            String cachedFile = checkCache(spotifyUrl);
+            if (cachedFile != null) {
+                System.out.println("✓ usando cache: " + cachedFile);
+                return cachedFile;
+            }
+
             System.out.println("baixando com spotdl: " + spotifyUrl);
 
-            // Usa caminho configurável do ffmpeg
-            String ffmpegPath = BotConfig.getFfmpegPath();
+            // Constrói o comando spotdl
+            ProcessBuilder pb;
+            String ffmpegPath = BotConfig.get("FFMPEG_PATH");
 
-            // Executa spotdl com caminho de output correto
-            ProcessBuilder pb = new ProcessBuilder(
-                    "spotdl",
-                    "--ffmpeg", ffmpegPath,
-                    "--output", downloadDir.toString() + "/{artists} - {title}.{output-ext}",
-                    spotifyUrl
-            );
+            // Extrai track ID para incluir no nome do arquivo (para cache)
+            String trackId = extractTrackId(spotifyUrl);
+            String outputPattern = trackId != null
+                ? downloadDir.toString() + "/{artists} - {title} [" + trackId + "].{output-ext}"
+                : downloadDir.toString() + "/{artists} - {title}.{output-ext}";
+
+            if (ffmpegPath != null && !ffmpegPath.isEmpty()) {
+                // Se FFMPEG_PATH estiver configurado, usa ele
+                pb = new ProcessBuilder(
+                        "spotdl",
+                        "download",
+                        spotifyUrl,  // URL primeiro
+                        "--ffmpeg", ffmpegPath,
+                        "--format", "mp3",
+                        "--bitrate", "96k",
+                        "--threads", "8",
+                        "--output", outputPattern,
+                        "--print-errors"
+                );
+            } else {
+                // Caso contrário, deixa spotdl usar o ffmpeg do sistema
+                pb = new ProcessBuilder(
+                        "spotdl",
+                        "download",
+                        spotifyUrl,  // URL primeiro
+                        "--format", "mp3",
+                        "--bitrate", "96k",
+                        "--threads", "8",
+                        "--output", outputPattern,
+                        "--print-errors"
+                );
+            }
 
             pb.redirectErrorStream(true);
             Process process = pb.start();
@@ -97,32 +131,34 @@ public class SpotifyDownloader {
                 return null;
             }
 
-            // Usa o trackName para encontrar o arquivo
-            if (trackName != null) {
-                // Procura arquivo com base no nome da track
-                String expectedFileName = trackName + ".mp3";
-                File expectedFile = downloadDir.resolve(expectedFileName).toFile();
+            // CRÍTICO: Usa trackId para busca exata
+            if (trackId != null) {
+                // Procura arquivo com trackId no nome
+                File[] filesWithId = downloadDir.toFile().listFiles((dir, name) ->
+                    name.endsWith(".mp3") && name.contains("[" + trackId + "]")
+                );
 
-                if (expectedFile.exists()) {
-                    downloadedFile = expectedFile.getAbsolutePath();
-                    System.out.println("arquivo encontrado: " + downloadedFile);
+                if (filesWithId != null && filesWithId.length > 0) {
+                    downloadedFile = filesWithId[0].getAbsolutePath();
+                    System.out.println("✓ cache hit: " + downloadedFile);
                 } else {
-                    // Tenta procurar arquivo similar
-                    System.out.println("procurando arquivo similar a: " + expectedFileName);
-                    final String artistName = trackName.contains(" - ") ? trackName.split(" - ")[0] : trackName;
-                    File[] files = downloadDir.toFile().listFiles((dir, name) ->
-                        name.endsWith(".mp3") && name.contains(artistName)
-                    );
-                    if (files != null && files.length > 0) {
-                        downloadedFile = files[0].getAbsolutePath();
-                        System.out.println("arquivo similar encontrado: " + downloadedFile);
+                    // Procura arquivo mais recente (recém baixado)
+                    System.out.println("procurando arquivo recém baixado...");
+                    File[] allFiles = downloadDir.toFile().listFiles((dir, name) -> name.endsWith(".mp3"));
+                    if (allFiles != null && allFiles.length > 0) {
+                        File newest = allFiles[0];
+                        for (File f : allFiles) {
+                            if (f.lastModified() > newest.lastModified()) {
+                                newest = f;
+                            }
+                        }
+                        downloadedFile = newest.getAbsolutePath();
+                        System.out.println("✓ novo download: " + downloadedFile);
                     }
                 }
-            }
-
-            // Se ainda não encontrou, procura o mais recente
-            if (downloadedFile == null) {
-                System.out.println("procurando arquivo mais recente no diretorio...");
+            } else {
+                // Fallback: procura o mais recente
+                System.out.println("sem trackId, procurando arquivo mais recente...");
                 File[] files = downloadDir.toFile().listFiles((dir, name) -> name.endsWith(".mp3"));
                 if (files != null && files.length > 0) {
                     File newest = files[0];
@@ -180,5 +216,70 @@ public class SpotifyDownloader {
 
     public Path getDownloadDir() {
         return downloadDir;
+    }
+
+    /**
+     * Verifica se a música já foi baixada (cache)
+     * Usa o ID do Spotify como chave
+     */
+    private String checkCache(String spotifyUrl) {
+        try {
+            // Extrai o ID da track da URL
+            String trackId = extractTrackId(spotifyUrl);
+            if (trackId == null) return null;
+
+            // Procura arquivo que contenha o ID no nome
+            File[] files = downloadDir.toFile().listFiles((dir, name) ->
+                name.endsWith(".mp3") && name.contains(trackId)
+            );
+
+            if (files != null && files.length > 0) {
+                return files[0].getAbsolutePath();
+            }
+
+            return null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
+     * Extrai o ID da track do Spotify da URL
+     */
+    private String extractTrackId(String url) {
+        try {
+            // https://open.spotify.com/track/5C8h9PY9oTneqJihbn10NB?si=...
+            // ou https://open.spotify.com/intl-pt/track/5C8h9PY9oTneqJihbn10NB
+            String[] parts = url.split("/track/");
+            if (parts.length > 1) {
+                String idPart = parts[1].split("\\?")[0];
+                return idPart;
+            }
+            return null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
+     * Limpa TODOS os arquivos do diretório de downloads
+     */
+    public void cleanupAllFiles() {
+        try {
+            File[] files = downloadDir.toFile().listFiles();
+            if (files != null) {
+                int deleted = 0;
+                for (File file : files) {
+                    if (file.isFile() && file.delete()) {
+                        deleted++;
+                    }
+                }
+                if (deleted > 0) {
+                    System.out.println("🗑️ Limpou " + deleted + " arquivo(s) da pasta music/");
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("erro ao limpar pasta music/: " + e.getMessage());
+        }
     }
 }

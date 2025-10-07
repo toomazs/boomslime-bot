@@ -5,24 +5,28 @@ import org.apache.hc.core5.http.ParseException;
 import se.michaelthelin.spotify.SpotifyApi;
 import se.michaelthelin.spotify.exceptions.SpotifyWebApiException;
 import se.michaelthelin.spotify.model_objects.credentials.ClientCredentials;
-import se.michaelthelin.spotify.model_objects.specification.Track;
+import se.michaelthelin.spotify.model_objects.specification.PlaylistTrack;
+import se.michaelthelin.spotify.model_objects.specification.Paging;
 import se.michaelthelin.spotify.requests.authorization.client_credentials.ClientCredentialsRequest;
-import se.michaelthelin.spotify.requests.data.tracks.GetTrackRequest;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Serviço para interagir com a API do Spotify.
+ * Serviço para interagir com o Spotify.
  */
 public class SpotifyService {
     private static SpotifyService INSTANCE;
     private final SpotifyApi spotifyApi;
     private long tokenExpirationTime = 0;
 
-    // Padrões de URL do Spotify
-    private static final Pattern SPOTIFY_TRACK_PATTERN = Pattern.compile("^https://open\\.spotify\\.com/track/([a-zA-Z0-9]+)");
+    // Padrões de URL do Spotify (suporta URLs internacionais como /intl-pt/, /intl-es/, etc)
+    private static final Pattern SPOTIFY_TRACK_PATTERN = Pattern.compile("^https://open\\.spotify\\.com/(?:intl-[a-z]{2}/)?track/([a-zA-Z0-9]+)");
+    private static final Pattern SPOTIFY_PLAYLIST_PATTERN = Pattern.compile("^https://open\\.spotify\\.com/(?:intl-[a-z]{2}/)?playlist/([a-zA-Z0-9]+)");
+    private static final Pattern SPOTIFY_ALBUM_PATTERN = Pattern.compile("^https://open\\.spotify\\.com/(?:intl-[a-z]{2}/)?album/([a-zA-Z0-9]+)");
     private static final Pattern SPOTIFY_TRACK_URI_PATTERN = Pattern.compile("^spotify:track:([a-zA-Z0-9]+)");
 
     private SpotifyService() {
@@ -34,8 +38,8 @@ public class SpotifyService {
                 .setClientSecret(clientSecret)
                 .build();
 
-        // Autentica imediatamente
         authenticate();
+        System.out.println("SpotifyService inicializado com API");
     }
 
     public static synchronized SpotifyService getInstance() {
@@ -45,95 +49,99 @@ public class SpotifyService {
         return INSTANCE;
     }
 
-    /**
-     * Autentica com o Spotify usando Client Credentials.
-     */
     private void authenticate() {
         try {
-            ClientCredentialsRequest clientCredentialsRequest = spotifyApi.clientCredentials().build();
-            ClientCredentials clientCredentials = clientCredentialsRequest.execute();
+            ClientCredentialsRequest request = spotifyApi.clientCredentials().build();
+            ClientCredentials credentials = request.execute();
 
-            // Define o access token
-            spotifyApi.setAccessToken(clientCredentials.getAccessToken());
+            spotifyApi.setAccessToken(credentials.getAccessToken());
+            tokenExpirationTime = System.currentTimeMillis() + (credentials.getExpiresIn() * 1000);
 
-            // Calcula quando o token expira (em milissegundos)
-            tokenExpirationTime = System.currentTimeMillis() + (clientCredentials.getExpiresIn() * 1000);
-
-            System.out.println("Autenticado com o Spotify! Token expira em " + clientCredentials.getExpiresIn() + " segundos.");
+            System.out.println("✓ Autenticado com Spotify API");
         } catch (IOException | SpotifyWebApiException | ParseException e) {
-            System.err.println("Erro ao autenticar com o Spotify: " + e.getMessage());
+            System.err.println("❌ Erro ao autenticar com Spotify: " + e.getMessage());
         }
     }
 
-    /**
-     * Verifica se o token expirou e reautentica se necessário.
-     */
     private void checkTokenExpiration() {
-        if (System.currentTimeMillis() >= tokenExpirationTime - 60000) { // Renova 1 minuto antes
+        if (System.currentTimeMillis() >= tokenExpirationTime - 60000) {
             authenticate();
         }
     }
 
     /**
-     * Verifica se uma URL é do Spotify.
+     * Verifica se uma URL é do Spotify (track, playlist ou album).
      */
     public boolean isSpotifyUrl(String url) {
-        return SPOTIFY_TRACK_PATTERN.matcher(url).find() || SPOTIFY_TRACK_URI_PATTERN.matcher(url).find();
+        return SPOTIFY_TRACK_PATTERN.matcher(url).find()
+            || SPOTIFY_PLAYLIST_PATTERN.matcher(url).find()
+            || SPOTIFY_ALBUM_PATTERN.matcher(url).find()
+            || SPOTIFY_TRACK_URI_PATTERN.matcher(url).find();
     }
 
     /**
-     * Extrai o ID da track de uma URL do Spotify.
+     * Verifica se é uma playlist
      */
-    private String extractTrackId(String url) {
-        Matcher matcher = SPOTIFY_TRACK_PATTERN.matcher(url);
+    public boolean isPlaylist(String url) {
+        return SPOTIFY_PLAYLIST_PATTERN.matcher(url).find();
+    }
+
+    /**
+     * Extrai o ID da playlist
+     */
+    private String extractPlaylistId(String url) {
+        Matcher matcher = SPOTIFY_PLAYLIST_PATTERN.matcher(url);
         if (matcher.find()) {
             return matcher.group(1);
         }
-
-        matcher = SPOTIFY_TRACK_URI_PATTERN.matcher(url);
-        if (matcher.find()) {
-            return matcher.group(1);
-        }
-
         return null;
     }
 
     /**
-     * Busca a URL do preview (30 segundos) de uma track do Spotify.
-     * @param spotifyUrl URL da música no Spotify
-     * @return URL do preview MP3 ou null se não houver
+     * Busca todas as músicas de uma playlist NA ORDEM
+     * @return Lista de URLs das tracks
      */
-    public String getSpotifyPreviewUrl(String spotifyUrl) {
+    public List<String> getPlaylistTracks(String playlistUrl) {
         checkTokenExpiration();
-
-        String trackId = extractTrackId(spotifyUrl);
-        if (trackId == null) {
-            System.err.println("nao consegui extrair ID do Spotify da URL: " + spotifyUrl);
-            return null;
-        }
-
-        System.out.println("track ID extraido: " + trackId);
+        List<String> trackUrls = new ArrayList<>();
 
         try {
-            GetTrackRequest getTrackRequest = spotifyApi.getTrack(trackId).build();
-            Track track = getTrackRequest.execute();
-
-            String previewUrl = track.getPreviewUrl();
-
-            if (previewUrl == null) {
-                System.out.println("track nao tem preview disponivel");
-                return null;
+            String playlistId = extractPlaylistId(playlistUrl);
+            if (playlistId == null) {
+                System.err.println("❌ ID da playlist inválido");
+                return trackUrls;
             }
 
-            String artist = track.getArtists()[0].getName();
-            String trackName = track.getName();
-            System.out.println("preview encontrado: " + artist + " - " + trackName);
+            System.out.println("📋 Buscando playlist: " + playlistId);
 
-            return previewUrl;
+            // Busca as tracks da playlist (máximo 100 por página)
+            int offset = 0;
+            Paging<PlaylistTrack> playlistTracks;
+
+            do {
+                playlistTracks = spotifyApi.getPlaylistsItems(playlistId)
+                        .limit(100)
+                        .offset(offset)
+                        .build()
+                        .execute();
+
+                for (PlaylistTrack item : playlistTracks.getItems()) {
+                    if (item.getTrack() != null && item.getTrack().getId() != null) {
+                        String trackUrl = "https://open.spotify.com/track/" + item.getTrack().getId();
+                        trackUrls.add(trackUrl);
+                    }
+                }
+
+                offset += 100;
+            } while (playlistTracks.getNext() != null);
+
+            System.out.println("✓ Encontradas " + trackUrls.size() + " músicas na playlist");
+
         } catch (IOException | SpotifyWebApiException | ParseException e) {
-            System.err.println("erro ao buscar track do Spotify: " + e.getMessage());
+            System.err.println("❌ Erro ao buscar playlist: " + e.getMessage());
             e.printStackTrace();
-            return null;
         }
+
+        return trackUrls;
     }
 }

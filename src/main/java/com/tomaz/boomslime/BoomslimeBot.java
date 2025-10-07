@@ -2,6 +2,7 @@ package com.tomaz.boomslime;
 
 import com.tomaz.boomslime.commands.CommandManager;
 import com.tomaz.boomslime.config.BotConfig;
+import com.tomaz.boomslime.music.SpotifyDownloader;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.entities.Activity;
@@ -16,6 +17,12 @@ public class BoomslimeBot {
             return;
         }
 
+        // Adiciona hook para limpar a pasta music/ ao parar o bot (Ctrl+C)
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            System.out.println("\n🛑 Parando bot...");
+            SpotifyDownloader.getInstance().cleanupAllFiles();
+        }));
+
         JDA jda = JDABuilder.createDefault(token)
                 .setActivity(Activity.listening("!help para ver comandos"))
                 .enableIntents(
@@ -27,5 +34,6 @@ public class BoomslimeBot {
                 .build();
 
         jda.awaitReady();
+        System.out.println("✅ Bot online! Ctrl+C para parar.");
     }
 }

@@ -8,6 +8,8 @@ import com.sedmelluq.discord.lavaplayer.track.AudioTrackEndReason;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
@@ -21,6 +23,11 @@ public class TrackScheduler extends AudioEventAdapter {
     private final List<AudioTrack> history; // Histórico de músicas tocadas
     private AudioTrack lastTrack; // Última música que tocou
 
+    // Fade-out simples
+    private static final long FADE_DURATION = 3000; // 3 segundos em ms
+    private Timer fadeTimer;
+    private boolean fadeStarted = false;
+
     /**
      * @param player O player de áudio que este agendador irá gerenciar.
      */
@@ -28,6 +35,7 @@ public class TrackScheduler extends AudioEventAdapter {
         this.player = player;
         this.queue = new LinkedBlockingQueue<>();
         this.history = new ArrayList<>();
+        this.fadeTimer = new Timer("FadeTimer", true);
     }
 
     /**
@@ -135,5 +143,78 @@ public class TrackScheduler extends AudioEventAdapter {
     @Override
     public void onTrackStart(AudioPlayer player, AudioTrack track) {
         this.lastTrack = track;
+        this.fadeStarted = false;
+        scheduleFadeOut(track);
+    }
+
+    /**
+     * Agenda o fade-out para começar 3 segundos antes do fim da música
+     */
+    private void scheduleFadeOut(AudioTrack track) {
+        // Cancela qualquer timer anterior
+        if (fadeTimer != null) {
+            fadeTimer.cancel();
+            fadeTimer = new Timer("FadeTimer", true);
+        }
+
+        // Se não há próxima música na fila, não faz fade
+        if (queue.isEmpty()) {
+            return;
+        }
+
+        long duration = track.getDuration();
+        // Se a música for muito curta (menos de 8 segundos), não faz fade
+        if (duration < 8000) {
+            return;
+        }
+
+        // Calcula quando começar o fade (3 segundos antes do fim)
+        long fadeStartTime = duration - FADE_DURATION;
+
+        fadeTimer.schedule(new TimerTask() {
+            @Override
+            public void run() {
+                startFadeOut();
+            }
+        }, fadeStartTime);
+
+        System.out.println("🎵 Fade-out agendado para " + (fadeStartTime / 1000) + "s");
+    }
+
+    /**
+     * Inicia o fade-out: reduz volume gradualmente nos últimos 3 segundos
+     */
+    private void startFadeOut() {
+        if (fadeStarted || queue.isEmpty()) {
+            return;
+        }
+
+        fadeStarted = true;
+        System.out.println("🎵 Iniciando fade-out...");
+
+        final int originalVolume = player.getVolume();
+        Timer timer = new Timer("FadeOutTimer", true);
+
+        timer.scheduleAtFixedRate(new TimerTask() {
+            int steps = 30; // 30 steps em 3 segundos = 100ms por step
+            int currentStep = 0;
+
+            @Override
+            public void run() {
+                if (currentStep >= steps) {
+                    timer.cancel();
+                    // Restaura volume e pula para próxima música
+                    player.setVolume(originalVolume);
+                    fadeStarted = false;
+                    return;
+                }
+
+                // Reduz o volume gradualmente (100% -> 20%)
+                float progress = (float) currentStep / steps;
+                int newVolume = (int) (originalVolume * (1.0f - (progress * 0.8f)));
+                player.setVolume(newVolume);
+                currentStep++;
+            }
+        }, 0, FADE_DURATION / 30); // 100ms por step
     }
 }

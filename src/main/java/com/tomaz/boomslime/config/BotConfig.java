@@ -1,9 +1,21 @@
 package com.tomaz.boomslime.config;
 
+import io.github.cdimascio.dotenv.Dotenv;
+
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
 public class BotConfig {
+
+    private static final Dotenv dotenv;
+
+    static {
+        // Carrega .env do diretório atual ou usa variáveis de ambiente do sistema
+        dotenv = Dotenv.configure()
+                .ignoreIfMissing()  // Não falha se .env não existir (usa env vars do sistema)
+                .load();
+        System.out.println(".env carregado com sucesso!");
+    }
 
     /**
      * Gets a configuration value from environment variables
@@ -11,7 +23,7 @@ public class BotConfig {
      * @return The configuration value or null if not found
      */
     public static String get(String key) {
-        return System.getenv(key);
+        return dotenv.get(key);
     }
 
     /**

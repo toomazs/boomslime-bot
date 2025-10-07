@@ -18,6 +18,7 @@ import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.managers.AudioManager;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class PlayerManager {
@@ -89,17 +90,27 @@ public class PlayerManager {
             return;
         }
 
-        event.getChannel().sendMessage("aguarde...").queue();
+        // Verifica se é playlist
+        if (spotifyService.isPlaylist(input)) {
+            loadPlaylist(event, input, musicManager);
+            return;
+        }
+
+        event.getChannel().sendMessage("🔍 procurando e baixando musica... (pode demorar ~20s)").queue();
 
         // Usa spotdl para baixar a música completa em uma thread separada
         new Thread(() -> {
+            long startTime = System.currentTimeMillis();
             SpotifyDownloader downloader = SpotifyDownloader.getInstance();
             String filePath = downloader.downloadTrack(input);
 
             if (filePath == null) {
-                event.getChannel().sendMessage("erro ao baixar musica").queue();
+                event.getChannel().sendMessage("❌ erro ao baixar musica").queue();
                 return;
             }
+
+            long downloadTime = (System.currentTimeMillis() - startTime) / 1000;
+            System.out.println("⏱️ Download concluído em " + downloadTime + "s");
 
             // Carrega o arquivo local no Lavaplayer
             this.audioPlayerManager.loadItemOrdered(musicManager, filePath, new AudioLoadResultHandler() {
@@ -145,6 +156,80 @@ public class PlayerManager {
 
             // Limpa arquivos antigos após adicionar à fila
             downloader.cleanupOldFiles();
+        }).start();
+    }
+
+    // Carrega e toca uma playlist completa do Spotify
+    private void loadPlaylist(MessageReceivedEvent event, String playlistUrl, GuildMusicManager musicManager) {
+        event.getChannel().sendMessage("📋 carregando playlist...").queue();
+
+        new Thread(() -> {
+            SpotifyService spotifyService = SpotifyService.getInstance();
+            List<String> trackUrls = spotifyService.getPlaylistTracks(playlistUrl);
+
+            if (trackUrls.isEmpty()) {
+                event.getChannel().sendMessage("❌ playlist vazia ou erro ao carregar").queue();
+                return;
+            }
+
+            event.getChannel().sendMessage("✓ " + trackUrls.size() + " musicas encontradas").queue();
+
+            // CRÍTICO: Processa SEQUENCIALMENTE para manter ordem
+            for (int i = 0; i < trackUrls.size(); i++) {
+                final String trackUrl = trackUrls.get(i);
+                final int trackNumber = i + 1;
+                final int totalTracks = trackUrls.size();
+
+                SpotifyDownloader downloader = SpotifyDownloader.getInstance();
+
+                // Download SÍNCRONO para manter ordem
+                String filePath = downloader.downloadTrack(trackUrl);
+
+                if (filePath == null) {
+                    System.err.println("❌ erro ao baixar track #" + trackNumber);
+                    continue; // Pula para próxima
+                }
+
+                // Carrega o arquivo no Lavaplayer
+                this.audioPlayerManager.loadItemOrdered(musicManager, filePath, new AudioLoadResultHandler() {
+                    @Override
+                    public void trackLoaded(AudioTrack track) {
+                        musicManager.getScheduler().queue(track);
+
+                        if (trackNumber == 1) {
+                            event.getChannel().sendMessage("▶ tocando primeira musica, baixando resto...").queue();
+                        }
+
+                        System.out.println("✓ [" + trackNumber + "/" + totalTracks + "] " + track.getInfo().title);
+                    }
+
+                    @Override
+                    public void playlistLoaded(AudioPlaylist playlist) {
+                        // Não deve acontecer com arquivo local
+                    }
+
+                    @Override
+                    public void noMatches() {
+                        System.err.println("❌ arquivo não encontrado: " + filePath);
+                    }
+
+                    @Override
+                    public void loadFailed(FriendlyException exception) {
+                        System.err.println("❌ erro ao carregar track #" + trackNumber + ": " + exception.getMessage());
+                    }
+                });
+
+                // Delay de 5 segundos entre downloads (exceto o último)
+                if (i < trackUrls.size() - 1) {
+                    try {
+                        Thread.sleep(5000);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+
+            event.getChannel().sendMessage("✅ playlist completa! " + trackUrls.size() + " musicas enfileiradas").queue();
         }).start();
     }
 }

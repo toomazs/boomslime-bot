@@ -1,0 +1,8 @@
+[phases.setup]
+nixPkgs = ["ffmpeg", "python311", "python311Packages.pip"]
+
+[phases.install]
+cmds = ["pip install --upgrade spotdl yt-dlp"]
+
+[start]
+cmd = "java -jar target/boomslime-bot-1.0-SNAPSHOT.jar"
