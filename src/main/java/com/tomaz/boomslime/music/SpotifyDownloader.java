@@ -86,8 +86,9 @@ public class SpotifyDownloader {
 
             // Extrai track ID para incluir no nome do arquivo (para cache)
             String trackId = extractTrackId(spotifyUrl);
+            // Usa apenas trackId no nome para evitar problemas com caracteres especiais em nomes
             String outputPattern = trackId != null
-                ? downloadDir.toString() + "/{artists} - {title} [" + trackId + "].{output-ext}"
+                ? downloadDir.toString() + "/" + trackId + ".{output-ext}"
                 : downloadDir.toString() + "/{artists} - {title}.{output-ext}";
 
             if (ffmpegPath != null && !ffmpegPath.isEmpty()) {
@@ -124,50 +125,39 @@ public class SpotifyDownloader {
             BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
             String line;
             String downloadedFile = null;
+            StringBuilder fullOutput = new StringBuilder();
 
-            String trackName = null;
             while ((line = reader.readLine()) != null) {
+                fullOutput.append(line).append("\n");
                 System.out.println("spotdl: " + line);
-
-                // Captura o nome da track (ex: "French Montana - Unforgettable")
-                if (line.contains("Skipping") && line.contains("(file already exists)")) {
-                    // Ex: "Skipping French Montana - Unforgettable (file already exists)"
-                    int start = line.indexOf("Skipping") + 9;
-                    int end = line.indexOf("(file already exists)");
-                    if (start > 0 && end > start) {
-                        trackName = line.substring(start, end).trim();
-                    }
-                } else if (line.contains("Downloaded")) {
-                    // Ex: "Downloaded "French Montana - Unforgettable""
-                    int start = line.indexOf("\"");
-                    int end = line.lastIndexOf("\"");
-                    if (start >= 0 && end > start) {
-                        trackName = line.substring(start + 1, end).trim();
-                    }
-                }
             }
 
-            boolean finished = process.waitFor(60, TimeUnit.SECONDS);
+            // Aumentado para 3 minutos (produção pode ser mais lenta)
+            boolean finished = process.waitFor(180, TimeUnit.SECONDS);
 
             reader.close();
 
             if (!finished) {
-                System.err.println("spotdl timeout");
+                System.err.println("spotdl timeout (>180s)");
                 process.destroyForcibly();
                 return null;
             }
 
             int exitCode = process.exitValue();
             if (exitCode != 0) {
-                System.err.println("spotdl falhou com codigo: " + exitCode);
+                System.err.println("========== SPOTDL ERROR ==========");
+                System.err.println("Exit code: " + exitCode);
+                System.err.println("URL: " + spotifyUrl);
+                System.err.println("Full output:\n" + fullOutput.toString());
+                System.err.println("==================================");
                 return null;
             }
 
             // CRÍTICO: Usa trackId para busca exata
             if (trackId != null) {
-                // Procura arquivo com trackId no nome
+                // Procura arquivo com trackId no nome (agora simplificado: trackId.mp3)
                 File[] filesWithId = downloadDir.toFile().listFiles((dir, name) ->
-                    name.endsWith(".mp3") && name.contains("[" + trackId + "]")
+                    name.endsWith(".mp3") && (name.contains(trackId) || name.startsWith(trackId))
                 );
 
                 if (filesWithId != null && filesWithId.length > 0) {
@@ -177,8 +167,19 @@ public class SpotifyDownloader {
                 }
             }
 
-            // Se não encontrou por trackId, procura o mais recente
-            System.err.println("arquivo nao encontrado com trackId, possivelmente o download falhou");
+            // Se não encontrou por trackId, procura o arquivo mais recente
+            File[] allMp3Files = downloadDir.toFile().listFiles((dir, name) -> name.endsWith(".mp3"));
+            if (allMp3Files != null && allMp3Files.length > 0) {
+                // Ordena por data de modificação (mais recente primeiro)
+                java.util.Arrays.sort(allMp3Files, (f1, f2) ->
+                    Long.compare(f2.lastModified(), f1.lastModified())
+                );
+                downloadedFile = allMp3Files[0].getAbsolutePath();
+                System.out.println("⚠ usando arquivo mais recente: " + downloadedFile);
+                return downloadedFile;
+            }
+
+            System.err.println("arquivo nao encontrado, download provavelmente falhou");
             return null;
 
         } catch (Exception e) {

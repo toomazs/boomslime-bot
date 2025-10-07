@@ -13,8 +13,11 @@ RUN apt-get update && \
     apt-get install -y python3 python3-pip ffmpeg && \
     apt-get clean
 
-# Instala o spotdl e o yt-dlp usando o pip (linha atualizada)
-RUN pip3 install spotdl yt-dlp
+# Instala versões específicas e atualizadas do spotdl e yt-dlp
+# yt-dlp precisa ser sempre a versão mais recente para funcionar
+RUN pip3 install --no-cache-dir --upgrade pip && \
+    pip3 install --no-cache-dir --upgrade yt-dlp && \
+    pip3 install --no-cache-dir spotdl
 
 WORKDIR /app
 

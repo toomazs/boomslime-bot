@@ -22,7 +22,6 @@ public class TrackScheduler extends AudioEventAdapter {
     private final AudioPlayer player;
     private final BlockingQueue<AudioTrack> queue;
     private final List<AudioTrack> history; // Histórico de músicas tocadas
-    private AudioTrack lastTrack; // Última música que tocou
     private MessageChannel textChannel; // Canal para enviar mensagens
 
     // Fade-out simples
@@ -161,7 +160,6 @@ public class TrackScheduler extends AudioEventAdapter {
 
     @Override
     public void onTrackStart(AudioPlayer player, AudioTrack track) {
-        this.lastTrack = track;
         this.fadeStarted = false;
         scheduleFadeOut(track);
 

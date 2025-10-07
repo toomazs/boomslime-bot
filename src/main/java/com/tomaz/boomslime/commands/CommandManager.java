@@ -15,10 +15,7 @@ import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 
 import java.awt.Color;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 
 public class CommandManager extends ListenerAdapter {
 
@@ -276,7 +273,6 @@ public class CommandManager extends ListenerAdapter {
             return;
         }
 
-        String trackName = player.getPlayingTrack().getInfo().title;
         musicManager.getScheduler().nextTrack();
         channel.sendMessage("⏭ pulandinhooo >///<").queue();
     }
@@ -449,15 +445,6 @@ public class CommandManager extends ListenerAdapter {
     }
 
     // Métodos auxiliares
-
-    private boolean isUrl(String input) {
-        try {
-            new URI(input);
-            return input.startsWith("http://") || input.startsWith("https://");
-        } catch (URISyntaxException e) {
-            return false;
-        }
-    }
 
     private boolean isUserInVoiceChannel(MessageReceivedEvent event) {
         Member member = event.getMember();
