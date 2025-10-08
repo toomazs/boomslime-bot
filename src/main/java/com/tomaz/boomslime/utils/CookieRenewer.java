@@ -129,10 +129,18 @@ public class CookieRenewer {
             // Cria instância do Playwright
             playwright = Playwright.create();
 
+            // Configura proxy se disponível
+            BrowserType.LaunchOptions launchOptions = new BrowserType.LaunchOptions()
+                    .setHeadless(true); // Headless = sem GUI
+
+            String proxyServer = BotConfig.get("PROXY_SERVER");
+            if (proxyServer != null && !proxyServer.isEmpty()) {
+                System.out.println("🌐 usando proxy: " + proxyServer);
+                launchOptions.setProxy(proxyServer);
+            }
+
             // Usa Firefox (mais leve que Chrome)
-            browser = playwright.firefox().launch(new BrowserType.LaunchOptions()
-                    .setHeadless(true) // Headless = sem GUI
-            );
+            browser = playwright.firefox().launch(launchOptions);
 
             // Cria ou reabre contexto persistente (mantém login entre execuções)
             context = browser.newContext(new Browser.NewContextOptions()
@@ -264,10 +272,18 @@ public class CookieRenewer {
             System.out.println("🚀 iniciando login automatico...");
             playwright = Playwright.create();
 
+            // Configura proxy se disponível
+            BrowserType.LaunchOptions launchOptions = new BrowserType.LaunchOptions()
+                    .setHeadless(true);
+
+            String proxyServer = BotConfig.get("PROXY_SERVER");
+            if (proxyServer != null && !proxyServer.isEmpty()) {
+                System.out.println("🌐 usando proxy: " + proxyServer);
+                launchOptions.setProxy(proxyServer);
+            }
+
             // Headless = sem interface gráfica
-            browser = playwright.firefox().launch(new BrowserType.LaunchOptions()
-                    .setHeadless(true)
-            );
+            browser = playwright.firefox().launch(launchOptions);
 
             // Cria contexto (sem state.json no primeiro login)
             Path statePath = renewer.persistentContextPath.resolve("state.json");

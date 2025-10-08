@@ -97,34 +97,38 @@ public class SpotifyDownloader {
                 ? downloadDir.toString() + "/{artists} - {title} [" + trackId + "].{output-ext}"
                 : downloadDir.toString() + "/{artists} - {title}.{output-ext}";
 
+            // Configura proxy se disponível
+            String proxyServer = BotConfig.get("PROXY_SERVER");
+            java.util.List<String> command = new java.util.ArrayList<>();
+            command.add("spotdl");
+            command.add("download");
+            command.add(spotifyUrl);
+
             if (ffmpegPath != null && !ffmpegPath.isEmpty()) {
-                // Se FFMPEG_PATH estiver configurado, usa ele
-                pb = new ProcessBuilder(
-                        "spotdl",
-                        "download",
-                        spotifyUrl,  // URL primeiro
-                        "--ffmpeg", ffmpegPath,
-                        "--format", "mp3",
-                        "--bitrate", "96k",
-                        "--threads", "8",
-                        "--output", outputPattern,
-                        "--cookie-file", "cookies.txt",
-                        "--print-errors"
-                );
-            } else {
-                // Caso contrário, deixa spotdl usar o ffmpeg do sistema
-                pb = new ProcessBuilder(
-                        "spotdl",
-                        "download",
-                        spotifyUrl,  // URL primeiro
-                        "--format", "mp3",
-                        "--bitrate", "96k",
-                        "--threads", "8",
-                        "--output", outputPattern,
-                        "--cookie-file", "cookies.txt",
-                        "--print-errors"
-                );
+                command.add("--ffmpeg");
+                command.add(ffmpegPath);
             }
+
+            command.add("--format");
+            command.add("mp3");
+            command.add("--bitrate");
+            command.add("96k");
+            command.add("--threads");
+            command.add("8");
+            command.add("--output");
+            command.add(outputPattern);
+            command.add("--cookie-file");
+            command.add("cookies.txt");
+
+            // Adiciona proxy se configurado
+            if (proxyServer != null && !proxyServer.isEmpty()) {
+                command.add("--proxy");
+                command.add(proxyServer);
+            }
+
+            command.add("--print-errors");
+
+            pb = new ProcessBuilder(command);
 
             pb.redirectErrorStream(true);
             Process process = pb.start();

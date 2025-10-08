@@ -125,16 +125,92 @@ java -cp boomslime-bot-1.0-SNAPSHOT.jar com.tomaz.boomslime.utils.CookieRenewer
 
 Os cookies serão renovados automaticamente a cada 6 horas em background.
 
+### Solução para VMs/Datacenters (YouTube bloqueia IPs):
+
+**Problema:** YouTube bloqueia downloads de IPs de datacenter (Azure, Oracle, DigitalOcean, etc.)
+
+**Solução:** Use túnel SSH reverso para rotear tráfego pela sua máquina local (IP residencial)
+
+#### Setup do túnel SSH (GRÁTIS):
+
+**1. Na sua máquina local (deve ficar ligada):**
+
+Instala SSH server:
+```bash
+sudo apt install openssh-server
+sudo systemctl start ssh
+sudo systemctl enable ssh
+```
+
+Cria túnel SOCKS5 reverso pro servidor:
+```bash
+# Substitua USER e SERVER-IP pelos dados do seu servidor
+ssh -D 9050 -N -f USER@SERVER-IP
+
+# Exemplo:
+# ssh -D 9050 -N -f root@68.183.227.146
+```
+
+**2. No servidor, adiciona no `.env`:**
+```bash
+PROXY_SERVER=socks5://localhost:9050
+COOKIE_RENEWER_ENABLED=true
+```
+
+**3. Copia cookies.txt da sua máquina pro servidor:**
+```bash
+# Gera cookies.txt no Firefox com extensão "Get cookies.txt LOCALLY"
+# Acesse https://music.youtube.com/ e exporte os cookies
+
+# Copia pro servidor
+scp cookies.txt USER@SERVER:/caminho/bot/
+```
+
+**4. No servidor, cria sessão inicial:**
+```bash
+# Cria diretório de sessão
+mkdir -p data/browser-session
+
+# Opção A: Copia state.json da máquina local (se tiver)
+scp -r data/browser-session USER@SERVER:/caminho/bot/data/
+
+# Opção B: Gera sessão vazia (renovação vai criar depois)
+echo '{"cookies":[],"origins":[]}' > data/browser-session/state.json
+```
+
+**5. Inicia o bot:**
+```bash
+java -jar target/boomslime-bot-1.0-SNAPSHOT.jar
+```
+
+O bot vai:
+- ✅ Usar o proxy SOCKS5 (túnel SSH)
+- ✅ YouTube vê seu IP residencial
+- ✅ Renovar cookies automaticamente a cada 6h
+- ✅ Funcionar perfeitamente em qualquer datacenter
+
+**Custo:** R$ 0,00 (apenas sua máquina ligada)
+**Consumo:** ~5-10 MB por música (~500 MB-1 GB/mês)
+
+---
+
 ### Troubleshooting:
 
 **Erro "Sign in to confirm you're not a bot":**
-- Execute o setup de cookies (passo 2 acima)
-- Certifique-se de que `COOKIE_RENEWER_ENABLED=true` no .env
+- Configure o túnel SSH (instruções acima)
+- Certifique-se de que `PROXY_SERVER` está configurado no .env
+- Verifique se cookies.txt existe e é válido
+
+**Túnel SSH desconecta:**
+```bash
+# Use autossh para manter túnel sempre ativo
+sudo apt install autossh
+autossh -M 0 -D 9050 -N -f USER@SERVER
+```
 
 **Servidor sem interface gráfica (headless):**
-- Instale Xvfb: `sudo apt install xvfb`
-- Execute setup com Xvfb: `xvfb-run java -cp boomslime-bot.jar com.tomaz.boomslime.utils.CookieRenewer`
-- Ou use VNC viewer para acessar GUI remotamente
+- Use cookies.txt exportado do Firefox (método recomendado)
+- Não é necessário rodar navegador no servidor
 
 ## sistema de cache
 
