@@ -80,13 +80,6 @@ public class SpotifyDownloader {
      */
     private String attemptDownload(String spotifyUrl) {
         try {
-            // Verifica se cookies.txt existe
-            if (!Files.exists(Paths.get("cookies.txt"))) {
-                System.err.println("⚠️  cookies.txt nao encontrado! Execute o setup inicial:");
-                System.err.println("   java -cp boomslime-bot.jar com.tomaz.boomslime.utils.CookieRenewer");
-                return null;
-            }
-
             // Constrói o comando spotdl
             ProcessBuilder pb;
             String ffmpegPath = BotConfig.get("FFMPEG_PATH");
@@ -117,8 +110,6 @@ public class SpotifyDownloader {
             command.add("8");
             command.add("--output");
             command.add(outputPattern);
-            command.add("--cookie-file");
-            command.add("cookies.txt");
 
             // Adiciona proxy se configurado
             if (proxyServer != null && !proxyServer.isEmpty()) {

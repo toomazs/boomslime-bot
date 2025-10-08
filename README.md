@@ -17,10 +17,11 @@ bot de musica do discord que baixa e toca musicas do spotify
 - jda (java discord api) 5.2.1
 - lavaplayer 2.2.2 (audio player)
 - spotify web api java 8.4.1
-- playwright 1.48.0 (renovação automática de cookies)
-- spotdl (download de musicas)
+- spotdl (download de musicas via proxy SSH)
 - yt-dlp (backend do spotdl)
 - ffmpeg (processamento de audio)
+- privoxy (converte SOCKS5 → HTTP para spotdl)
+- túnel SSH (usa IP residencial em VMs/datacenters)
 - maven (build)
 
 ## comandos
@@ -39,13 +40,13 @@ bot de musica do discord que baixa e toca musicas do spotify
 ### 1. Configuração inicial
 
 Cria um arquivo `.env` na raiz do projeto:
-```
+```env
 TOKEN=seu_token_do_discord
 SPOTIFY_CLIENT_ID=seu_client_id
 SPOTIFY_CLIENT_SECRET=seu_client_secret
 MUSIC_DIR=./data/music
-COOKIE_RENEWER_ENABLED=true
 DATA_DIR=./data
+PROXY_SERVER=http://127.0.0.1:8118
 ```
 
 ### 2. Instala dependências
@@ -53,37 +54,18 @@ DATA_DIR=./data
 ```bash
 # Ubuntu/Debian
 sudo apt install ffmpeg python3 python3-pip default-jdk maven
-pip3 install spotdl yt-dlp playwright
-playwright install firefox
-playwright install-deps firefox
+pip3 install spotdl yt-dlp
 
 # Arch
 sudo pacman -S ffmpeg python python-pip jdk-openjdk maven
-pip install spotdl yt-dlp playwright
-playwright install firefox
-playwright install-deps firefox
+pip install spotdl yt-dlp
 ```
 
-### 3. Setup de cookies do YouTube (IMPORTANTE!)
+### 3. Builda o projeto
 
-O bot precisa de cookies válidos do YouTube para baixar músicas em servidores (VMs).
-
-**Execute o setup inicial:**
 ```bash
 mvn clean package
-java -cp target/boomslime-bot-1.0-SNAPSHOT.jar com.tomaz.boomslime.utils.CookieRenewer
 ```
-
-**O que vai acontecer:**
-1. Um navegador Firefox vai abrir automaticamente
-2. Faça login na sua conta do YouTube/Google (pode ser conta grátis)
-3. Feche o navegador manualmente após o login
-4. Os cookies serão salvos e renovados automaticamente a cada 6 horas
-
-**IMPORTANTE:**
-- Execute este comando **no servidor/VM** onde o bot vai rodar
-- Você precisa de interface gráfica (X11) ou X11 forwarding habilitado
-- Se estiver em servidor sem GUI, use: `ssh -X user@servidor` para conectar com X11 forwarding
 
 ### 4. Roda o bot
 
@@ -91,10 +73,7 @@ java -cp target/boomslime-bot-1.0-SNAPSHOT.jar com.tomaz.boomslime.utils.CookieR
 java -jar target/boomslime-bot-1.0-SNAPSHOT.jar
 ```
 
-O bot vai:
-- ✅ Iniciar o renovador automático de cookies (roda a cada 6h em background)
-- ✅ Baixar músicas usando cookies válidos do YouTube
-- ✅ Funcionar em qualquer datacenter (Azure, Oracle, DigitalOcean, etc.)
+**Nota:** Para rodar em VMs/datacenters onde YouTube bloqueia IPs, veja a seção [Deploy em servidores](#deploy-em-servidores-railwayvmscloud) abaixo.
 
 ## deploy em servidores (Railway/VMs/Cloud)
 
