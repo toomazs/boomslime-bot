@@ -110,16 +110,15 @@ public class SpotifyDownloader {
             command.add("8");
             command.add("--output");
             command.add(outputPattern);
-
-            // Adiciona proxy se configurado
-            if (proxyServer != null && !proxyServer.isEmpty()) {
-                command.add("--proxy");
-                command.add(proxyServer);
-            }
-
             command.add("--print-errors");
 
             pb = new ProcessBuilder(command);
+
+            // Configura variáveis de ambiente para proxy
+            if (proxyServer != null && !proxyServer.isEmpty()) {
+                pb.environment().put("HTTP_PROXY", proxyServer);
+                pb.environment().put("HTTPS_PROXY", proxyServer);
+            }
 
             pb.redirectErrorStream(true);
             Process process = pb.start();
