@@ -17,6 +17,7 @@ bot de musica do discord que baixa e toca musicas do spotify
 - jda (java discord api) 5.2.1
 - lavaplayer 2.2.2 (audio player)
 - spotify web api java 8.4.1
+- playwright 1.48.0 (renovação automática de cookies)
 - spotdl (download de musicas)
 - yt-dlp (backend do spotdl)
 - ffmpeg (processamento de audio)
@@ -35,46 +36,105 @@ bot de musica do discord que baixa e toca musicas do spotify
 
 ## como rodar
 
-1. cria um arquivo `.env` na raiz do projeto com:
+### 1. Configuração inicial
+
+Cria um arquivo `.env` na raiz do projeto:
 ```
 TOKEN=seu_token_do_discord
 SPOTIFY_CLIENT_ID=seu_client_id
 SPOTIFY_CLIENT_SECRET=seu_client_secret
 MUSIC_DIR=./data/music
+COOKIE_RENEWER_ENABLED=true
+DATA_DIR=./data
 ```
 
-2. instala as dependencias:
+### 2. Instala dependências
+
 ```bash
-# ubuntu/debian
-sudo apt install ffmpeg python3 python3-pip
-pip3 install spotdl yt-dlp
+# Ubuntu/Debian
+sudo apt install ffmpeg python3 python3-pip default-jdk maven
+pip3 install spotdl yt-dlp playwright
+playwright install firefox
+playwright install-deps firefox
 
-# arch
-sudo pacman -S ffmpeg python python-pip
-pip install spotdl yt-dlp
+# Arch
+sudo pacman -S ffmpeg python python-pip jdk-openjdk maven
+pip install spotdl yt-dlp playwright
+playwright install firefox
+playwright install-deps firefox
 ```
 
-3. builda o projeto:
+### 3. Setup de cookies do YouTube (IMPORTANTE!)
+
+O bot precisa de cookies válidos do YouTube para baixar músicas em servidores (VMs).
+
+**Execute o setup inicial:**
 ```bash
 mvn clean package
+java -cp target/boomslime-bot-1.0-SNAPSHOT.jar com.tomaz.boomslime.utils.CookieRenewer
 ```
 
-4. roda o bot:
+**O que vai acontecer:**
+1. Um navegador Firefox vai abrir automaticamente
+2. Faça login na sua conta do YouTube/Google (pode ser conta grátis)
+3. Feche o navegador manualmente após o login
+4. Os cookies serão salvos e renovados automaticamente a cada 6 horas
+
+**IMPORTANTE:**
+- Execute este comando **no servidor/VM** onde o bot vai rodar
+- Você precisa de interface gráfica (X11) ou X11 forwarding habilitado
+- Se estiver em servidor sem GUI, use: `ssh -X user@servidor` para conectar com X11 forwarding
+
+### 4. Roda o bot
+
 ```bash
 java -jar target/boomslime-bot-1.0-SNAPSHOT.jar
 ```
 
-## deploy no railway
+O bot vai:
+- ✅ Iniciar o renovador automático de cookies (roda a cada 6h em background)
+- ✅ Baixar músicas usando cookies válidos do YouTube
+- ✅ Funcionar em qualquer datacenter (Azure, Oracle, DigitalOcean, etc.)
 
-o projeto ja vem com `nixpacks.toml` configurado pra deploy no railway.
+## deploy em servidores (Railway/VMs/Cloud)
 
-so precisa adicionar as variaveis de ambiente no painel do railway:
-- `TOKEN`
-- `SPOTIFY_CLIENT_ID`
-- `SPOTIFY_CLIENT_SECRET`
-- `MUSIC_DIR` (opcional, padrao: `./data/music`)
+O projeto já vem com `nixpacks.toml` configurado.
 
-o railway tem 5gb de disco, suficiente pra ~1400 musicas em cache.
+### Variáveis de ambiente necessárias:
+- `TOKEN` - Token do bot Discord
+- `SPOTIFY_CLIENT_ID` - Client ID do Spotify
+- `SPOTIFY_CLIENT_SECRET` - Client Secret do Spotify
+- `MUSIC_DIR` - Diretório de cache (padrão: `./data/music`)
+- `COOKIE_RENEWER_ENABLED` - `true` para renovação automática (padrão: `true`)
+- `DATA_DIR` - Diretório de dados (padrão: `./data`)
+
+### Setup inicial em servidores:
+
+**1. Faça deploy normalmente**
+
+**2. Execute o setup de cookies via SSH com X11 forwarding:**
+```bash
+# Conecta com X11 forwarding
+ssh -X user@seu-servidor
+
+# Executa setup de cookies
+java -cp boomslime-bot-1.0-SNAPSHOT.jar com.tomaz.boomslime.utils.CookieRenewer
+```
+
+**3. Reinicia o bot**
+
+Os cookies serão renovados automaticamente a cada 6 horas em background.
+
+### Troubleshooting:
+
+**Erro "Sign in to confirm you're not a bot":**
+- Execute o setup de cookies (passo 2 acima)
+- Certifique-se de que `COOKIE_RENEWER_ENABLED=true` no .env
+
+**Servidor sem interface gráfica (headless):**
+- Instale Xvfb: `sudo apt install xvfb`
+- Execute setup com Xvfb: `xvfb-run java -cp boomslime-bot.jar com.tomaz.boomslime.utils.CookieRenewer`
+- Ou use VNC viewer para acessar GUI remotamente
 
 ## sistema de cache
 

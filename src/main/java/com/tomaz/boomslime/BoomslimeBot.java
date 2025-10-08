@@ -3,6 +3,7 @@ package com.tomaz.boomslime;
 import com.tomaz.boomslime.commands.CommandManager;
 import com.tomaz.boomslime.config.BotConfig;
 import com.tomaz.boomslime.music.SpotifyDownloader;
+import com.tomaz.boomslime.utils.CookieRenewer;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.entities.Activity;
@@ -19,6 +20,9 @@ public class BoomslimeBot {
 
         // Inicia auto-limpeza de arquivos antigos (24h)
         SpotifyDownloader.getInstance().startAutoCleanup();
+
+        // Inicia renovador automático de cookies do YouTube
+        CookieRenewer.getInstance().start();
 
         JDA jda = JDABuilder.createDefault(token)
                 .setActivity(Activity.listening("vozes da minha cabeca"))
