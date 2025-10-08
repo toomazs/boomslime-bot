@@ -79,7 +79,16 @@ public class SpotifyDownloader {
      * Tenta fazer o download uma vez
      */
     private String attemptDownload(String spotifyUrl) {
+        Process process = null;
+        BufferedReader reader = null;
+
         try {
+            // Verifica se a thread foi interrompida
+            if (Thread.currentThread().isInterrupted()) {
+                System.out.println("⏹ Download interrompido antes de começar");
+                return null;
+            }
+
             // Constrói o comando spotdl
             ProcessBuilder pb;
             String ffmpegPath = BotConfig.get("FFMPEG_PATH");
@@ -121,15 +130,22 @@ public class SpotifyDownloader {
             }
 
             pb.redirectErrorStream(true);
-            Process process = pb.start();
+            process = pb.start();
 
             // Lê a saída do spotdl
-            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+            reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
             String line;
             String downloadedFile = null;
 
             String trackName = null;
             while ((line = reader.readLine()) != null) {
+                // Verifica se foi interrompido durante o download
+                if (Thread.currentThread().isInterrupted()) {
+                    System.out.println("⏹ Download interrompido durante execução");
+                    process.destroyForcibly();
+                    return null;
+                }
+
                 System.out.println("spotdl: " + line);
 
                 // Captura o nome da track (ex: "French Montana - Unforgettable")
@@ -184,10 +200,27 @@ public class SpotifyDownloader {
             System.err.println("arquivo nao encontrado com trackId, possivelmente o download falhou");
             return null;
 
+        } catch (InterruptedException e) {
+            System.out.println("⏹ Download interrompido: " + spotifyUrl);
+            if (process != null) {
+                process.destroyForcibly();
+            }
+            Thread.currentThread().interrupt(); // Restaura flag de interrupção
+            return null;
         } catch (Exception e) {
             System.err.println("erro ao baixar musica: " + e.getMessage());
             e.printStackTrace();
             return null;
+        } finally {
+            // Cleanup
+            if (reader != null) {
+                try {
+                    reader.close();
+                } catch (IOException ignored) {}
+            }
+            if (process != null && process.isAlive()) {
+                process.destroyForcibly();
+            }
         }
     }
 

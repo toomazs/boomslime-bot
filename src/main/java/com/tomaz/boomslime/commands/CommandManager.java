@@ -358,9 +358,18 @@ public class CommandManager extends ListenerAdapter {
             return;
         }
 
+        long guildId = event.getGuild().getIdLong();
+
+        // PRIORIDADE: Cancela TODOS os downloads em andamento
+        com.tomaz.boomslime.music.DownloadManager.getInstance().cancelAllDownloads(guildId);
+
+        // Para o player e limpa a fila
         GuildMusicManager musicManager = PlayerManager.getInstance().getMusicManager(event.getGuild());
         musicManager.getScheduler().stop();
+
+        // Desconecta do canal de voz
         event.getGuild().getAudioManager().closeAudioConnection();
+
         channel.sendMessage("■ paradinho >///<").queue();
     }
 

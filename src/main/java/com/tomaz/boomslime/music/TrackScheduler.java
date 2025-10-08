@@ -106,9 +106,17 @@ public class TrackScheduler extends AudioEventAdapter {
      * Para o player e limpa a fila.
      */
     public void stop() {
+        // Cancela o fade-out timer se existir
+        if (fadeTimer != null) {
+            fadeTimer.cancel();
+            fadeTimer = new Timer("FadeTimer", true);
+        }
+
+        // Limpa tudo
         queue.clear();
         history.clear();
         player.stopTrack();
+        fadeStarted = false;
     }
 
     /**

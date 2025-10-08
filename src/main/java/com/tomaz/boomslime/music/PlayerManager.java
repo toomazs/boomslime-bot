@@ -85,6 +85,10 @@ public class PlayerManager {
         // Define o canal de texto para mensagens
         musicManager.setTextChannel(event.getChannel());
 
+        // Reseta o estado de download (permite novos downloads após !stop)
+        long guildId = event.getGuild().getIdLong();
+        DownloadManager.getInstance().getGuildState(guildId).reset();
+
         // Verifica se é URL do Spotify
         SpotifyService spotifyService = SpotifyService.getInstance();
 
@@ -101,15 +105,17 @@ public class PlayerManager {
 
         event.getChannel().sendMessage("baixando e jogando na fila, one sec lil bro...").queue();
 
-        // Usa spotdl para baixar a música completa em uma thread separada
-        new Thread(() -> {
+        DownloadManager downloadManager = DownloadManager.getInstance();
+
+        // Submete o download usando o DownloadManager (com suporte a cancelamento)
+        downloadManager.submitDownload(guildId, () -> {
             long startTime = System.currentTimeMillis();
             SpotifyDownloader downloader = SpotifyDownloader.getInstance();
             String filePath = downloader.downloadTrack(input);
 
             if (filePath == null) {
                 event.getChannel().sendMessage("cusao tentei 3x baixar essa msc mas deu bidu. pula essa porra ai e manda outra >.<").queue();
-                return;
+                return null;
             }
 
             long downloadTime = (System.currentTimeMillis() - startTime) / 1000;
@@ -117,63 +123,76 @@ public class PlayerManager {
 
             // Carrega o arquivo local no Lavaplayer
             this.audioPlayerManager.loadItemOrdered(musicManager, filePath, new AudioLoadResultHandler() {
-            @Override
-            public void trackLoaded(AudioTrack track) {
-                boolean isPlaying = musicManager.getAudioPlayer().getPlayingTrack() != null;
-                String trackInfo = track.getInfo().title + " - " + track.getInfo().author;
+                @Override
+                public void trackLoaded(AudioTrack track) {
+                    boolean isPlaying = musicManager.getAudioPlayer().getPlayingTrack() != null;
+                    String trackInfo = track.getInfo().title + " - " + track.getInfo().author;
 
-                musicManager.getScheduler().queue(track);
+                    musicManager.getScheduler().queue(track);
 
-                if (isPlaying) {
-                    event.getChannel().sendMessage("✓ " + trackInfo + " foi adicionado a fila com sucesso, chefe").queue();
-                }
-            }
-
-            @Override
-            public void playlistLoaded(AudioPlaylist playlist) {
-                if (playlist.isSearchResult()) {
-                    AudioTrack firstTrack = playlist.getTracks().get(0);
-                    event.getChannel().sendMessage("▶ to tocano agr: **" + firstTrack.getInfo().title + " - " + firstTrack.getInfo().author + "**").queue();
-                    musicManager.getScheduler().queue(firstTrack);
-                } else {
-                    event.getChannel().sendMessage("playlist adicionada c sucesso xD: " + playlist.getName() + " (" + playlist.getTracks().size() + " musicas)").queue();
-                    for (AudioTrack track : playlist.getTracks()) {
-                        musicManager.getScheduler().queue(track);
+                    if (isPlaying) {
+                        event.getChannel().sendMessage("✓ " + trackInfo + " foi adicionado a fila com sucesso, chefe").queue();
                     }
                 }
-            }
 
-            @Override
-            public void noMatches() {
-                event.getChannel().sendMessage("nao encontrei a musica dog, taca msc de gente aew").queue();
-            }
+                @Override
+                public void playlistLoaded(AudioPlaylist playlist) {
+                    if (playlist.isSearchResult()) {
+                        AudioTrack firstTrack = playlist.getTracks().get(0);
+                        event.getChannel().sendMessage("▶ to tocano agr: **" + firstTrack.getInfo().title + " - " + firstTrack.getInfo().author + "**").queue();
+                        musicManager.getScheduler().queue(firstTrack);
+                    } else {
+                        event.getChannel().sendMessage("playlist adicionada c sucesso xD: " + playlist.getName() + " (" + playlist.getTracks().size() + " musicas)").queue();
+                        for (AudioTrack track : playlist.getTracks()) {
+                            musicManager.getScheduler().queue(track);
+                        }
+                    }
+                }
 
-            @Override
-            public void loadFailed(FriendlyException exception) {
-                event.getChannel().sendMessage("erro ao tocar sa porra, pede pro dodis debuggar: " + exception.getMessage()).queue();
-                exception.printStackTrace(); // Debug
-            }
+                @Override
+                public void noMatches() {
+                    event.getChannel().sendMessage("nao encontrei a musica dog, taca msc de gente aew").queue();
+                }
+
+                @Override
+                public void loadFailed(FriendlyException exception) {
+                    event.getChannel().sendMessage("erro ao tocar sa porra, pede pro dodis debuggar: " + exception.getMessage()).queue();
+                    exception.printStackTrace(); // Debug
+                }
+            });
+
+            return filePath;
         });
-        }).start();
     }
 
     // Carrega e toca uma playlist completa do Spotify
     private void loadPlaylist(MessageReceivedEvent event, String playlistUrl, GuildMusicManager musicManager) {
         event.getChannel().sendMessage("carregando playlist veia podi...").queue();
 
-        new Thread(() -> {
+        long guildId = event.getGuild().getIdLong();
+        DownloadManager downloadManager = DownloadManager.getInstance();
+
+        // Submete tarefa de playlist usando o DownloadManager
+        downloadManager.submitDownload(guildId, () -> {
             SpotifyService spotifyService = SpotifyService.getInstance();
             List<String> trackUrls = spotifyService.getPlaylistTracks(playlistUrl);
 
             if (trackUrls.isEmpty()) {
                 event.getChannel().sendMessage("playlist ou eh privada, ou ta vazia ou deu bidu .-.").queue();
-                return;
+                return null;
             }
 
             event.getChannel().sendMessage(trackUrls.size() + " musicas bosta encontradas, aguarda ai q to baxano").queue();
 
             // CRÍTICO: Processa SEQUENCIALMENTE para manter ordem
             for (int i = 0; i < trackUrls.size(); i++) {
+                // Verifica se foi interrompido
+                if (Thread.currentThread().isInterrupted()) {
+                    System.out.println("⏹ Download de playlist interrompido");
+                    event.getChannel().sendMessage("⏹ download de playlist cancelado").queue();
+                    return null;
+                }
+
                 final String trackUrl = trackUrls.get(i);
                 final int trackNumber = i + 1;
                 final int totalTracks = trackUrls.size();
@@ -184,6 +203,12 @@ public class PlayerManager {
                 String filePath = downloader.downloadTrack(trackUrl);
 
                 if (filePath == null) {
+                    // Verifica se foi interrompido (null pode ser por cancelamento)
+                    if (Thread.currentThread().isInterrupted()) {
+                        System.out.println("⏹ Download de playlist interrompido");
+                        return null;
+                    }
+
                     System.err.println("❌ erro ao baixar track #" + trackNumber);
                     event.getChannel().sendMessage("**X** pulei a track #" + trackNumber + " pq deu erro 3x ao baixar, pfv da proxima sem musicas paraguaias").queue();
                     continue; // Pula para próxima
@@ -219,12 +244,15 @@ public class PlayerManager {
                     try {
                         Thread.sleep(5000);
                     } catch (InterruptedException e) {
-                        e.printStackTrace();
+                        System.out.println("⏹ Download de playlist interrompido durante delay");
+                        Thread.currentThread().interrupt();
+                        return null;
                     }
                 }
             }
 
             event.getChannel().sendMessage("playlist completa >///<: " + trackUrls.size() + " musicas enfileiradas").queue();
-        }).start();
+            return "playlist_complete";
+        });
     }
 }
