@@ -129,24 +129,24 @@ public class CookieRenewer {
             // Cria instância do Playwright
             playwright = Playwright.create();
 
-            // Configura proxy se disponível
-            BrowserType.LaunchOptions launchOptions = new BrowserType.LaunchOptions()
-                    .setHeadless(true); // Headless = sem GUI
+            // Usa Firefox (mais leve que Chrome)
+            browser = playwright.firefox().launch(new BrowserType.LaunchOptions()
+                    .setHeadless(true) // Headless = sem GUI
+            );
+
+            // Configura contexto com proxy se disponível
+            Browser.NewContextOptions contextOptions = new Browser.NewContextOptions()
+                    .setStorageStatePath(persistentContextPath.resolve("state.json"))
+                    .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:122.0) Gecko/20100101 Firefox/122.0");
 
             String proxyServer = BotConfig.get("PROXY_SERVER");
             if (proxyServer != null && !proxyServer.isEmpty()) {
                 System.out.println("🌐 usando proxy: " + proxyServer);
-                launchOptions.setProxy(proxyServer);
+                contextOptions.setProxy(proxyServer);
             }
 
-            // Usa Firefox (mais leve que Chrome)
-            browser = playwright.firefox().launch(launchOptions);
-
             // Cria ou reabre contexto persistente (mantém login entre execuções)
-            context = browser.newContext(new Browser.NewContextOptions()
-                    .setStorageStatePath(persistentContextPath.resolve("state.json"))
-                    .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:122.0) Gecko/20100101 Firefox/122.0")
-            );
+            context = browser.newContext(contextOptions);
 
             // Acessa YouTube Music
             Page page = context.newPage();
@@ -272,18 +272,10 @@ public class CookieRenewer {
             System.out.println("🚀 iniciando login automatico...");
             playwright = Playwright.create();
 
-            // Configura proxy se disponível
-            BrowserType.LaunchOptions launchOptions = new BrowserType.LaunchOptions()
-                    .setHeadless(true);
-
-            String proxyServer = BotConfig.get("PROXY_SERVER");
-            if (proxyServer != null && !proxyServer.isEmpty()) {
-                System.out.println("🌐 usando proxy: " + proxyServer);
-                launchOptions.setProxy(proxyServer);
-            }
-
             // Headless = sem interface gráfica
-            browser = playwright.firefox().launch(launchOptions);
+            browser = playwright.firefox().launch(new BrowserType.LaunchOptions()
+                    .setHeadless(true)
+            );
 
             // Cria contexto (sem state.json no primeiro login)
             Path statePath = renewer.persistentContextPath.resolve("state.json");
@@ -293,6 +285,13 @@ public class CookieRenewer {
             // Só usa storageState se arquivo já existir
             if (Files.exists(statePath)) {
                 contextOptions.setStorageStatePath(statePath);
+            }
+
+            // Configura proxy se disponível
+            String proxyServer = BotConfig.get("PROXY_SERVER");
+            if (proxyServer != null && !proxyServer.isEmpty()) {
+                System.out.println("🌐 usando proxy: " + proxyServer);
+                contextOptions.setProxy(proxyServer);
             }
 
             context = browser.newContext(contextOptions);
