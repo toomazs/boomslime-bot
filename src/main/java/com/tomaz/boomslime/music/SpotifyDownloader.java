@@ -8,15 +8,11 @@ import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.TimeUnit;
 
-/**
- * Usa spotdl para baixar músicas completas do Spotify
- */
 public class SpotifyDownloader {
     private static SpotifyDownloader INSTANCE;
     private final Path downloadDir;
 
     private SpotifyDownloader() {
-        // Usa o diretório configurável
         this.downloadDir = BotConfig.getMusicDir();
         try {
             Files.createDirectories(downloadDir);
@@ -33,22 +29,13 @@ public class SpotifyDownloader {
         return INSTANCE;
     }
 
-    /**
-     * Baixa uma música do Spotify e retorna o caminho do arquivo
-     * Usa cache se a música já foi baixada
-     * Tenta até 3 vezes em caso de erro
-     * @param spotifyUrl URL da música no Spotify
-     * @return Caminho do arquivo MP3 baixado ou null se falhar
-     */
     public String downloadTrack(String spotifyUrl) {
-        // Verifica se já existe no cache
         String cachedFile = checkCache(spotifyUrl);
         if (cachedFile != null) {
             System.out.println("✓ usando cache: " + cachedFile);
             return cachedFile;
         }
 
-        // Tenta até 3 vezes
         final int MAX_RETRIES = 3;
         for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
             System.out.println("baixando com spotdl (tentativa " + attempt + "/" + MAX_RETRIES + "): " + spotifyUrl);
@@ -59,7 +46,6 @@ public class SpotifyDownloader {
                 return result;
             }
 
-            // Se falhou e não é última tentativa, espera 5 segundos
             if (attempt < MAX_RETRIES) {
                 System.out.println("aguardando 5s antes de tentar novamente...");
                 try {
@@ -70,36 +56,28 @@ public class SpotifyDownloader {
             }
         }
 
-        // Falhou após 3 tentativas
         System.err.println("download falhou apos " + MAX_RETRIES + " tentativas: " + spotifyUrl);
         return null;
     }
 
-    /**
-     * Tenta fazer o download uma vez
-     */
     private String attemptDownload(String spotifyUrl) {
         Process process = null;
         BufferedReader reader = null;
 
         try {
-            // Verifica se a thread foi interrompida
             if (Thread.currentThread().isInterrupted()) {
                 System.out.println("⏹ Download interrompido antes de começar");
                 return null;
             }
 
-            // Constrói o comando spotdl
             ProcessBuilder pb;
             String ffmpegPath = BotConfig.get("FFMPEG_PATH");
 
-            // Extrai track ID para incluir no nome do arquivo (para cache)
             String trackId = extractTrackId(spotifyUrl);
             String outputPattern = trackId != null
                 ? downloadDir.toString() + "/{artists} - {title} [" + trackId + "].{output-ext}"
                 : downloadDir.toString() + "/{artists} - {title}.{output-ext}";
 
-            // Configura proxy se disponível
             String proxyServer = BotConfig.get("PROXY_SERVER");
             java.util.List<String> command = new java.util.ArrayList<>();
             command.add("spotdl");
@@ -123,7 +101,6 @@ public class SpotifyDownloader {
 
             pb = new ProcessBuilder(command);
 
-            // Configura variáveis de ambiente para proxy
             if (proxyServer != null && !proxyServer.isEmpty()) {
                 pb.environment().put("HTTP_PROXY", proxyServer);
                 pb.environment().put("HTTPS_PROXY", proxyServer);
@@ -132,14 +109,12 @@ public class SpotifyDownloader {
             pb.redirectErrorStream(true);
             process = pb.start();
 
-            // Lê a saída do spotdl
             reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
             String line;
             String downloadedFile = null;
 
             String trackName = null;
             while ((line = reader.readLine()) != null) {
-                // Verifica se foi interrompido durante o download
                 if (Thread.currentThread().isInterrupted()) {
                     System.out.println("⏹ Download interrompido durante execução");
                     process.destroyForcibly();
@@ -148,16 +123,13 @@ public class SpotifyDownloader {
 
                 System.out.println("spotdl: " + line);
 
-                // Captura o nome da track (ex: "French Montana - Unforgettable")
                 if (line.contains("Skipping") && line.contains("(file already exists)")) {
-                    // Ex: "Skipping French Montana - Unforgettable (file already exists)"
                     int start = line.indexOf("Skipping") + 9;
                     int end = line.indexOf("(file already exists)");
                     if (start > 0 && end > start) {
                         trackName = line.substring(start, end).trim();
                     }
                 } else if (line.contains("Downloaded")) {
-                    // Ex: "Downloaded "French Montana - Unforgettable""
                     int start = line.indexOf("\"");
                     int end = line.lastIndexOf("\"");
                     if (start >= 0 && end > start) {
@@ -182,9 +154,7 @@ public class SpotifyDownloader {
                 return null;
             }
 
-            // CRÍTICO: Usa trackId para busca exata
             if (trackId != null) {
-                // Procura arquivo com trackId no nome
                 File[] filesWithId = downloadDir.toFile().listFiles((dir, name) ->
                     name.endsWith(".mp3") && name.contains("[" + trackId + "]")
                 );
@@ -196,7 +166,6 @@ public class SpotifyDownloader {
                 }
             }
 
-            // Se não encontrou por trackId, procura o mais recente
             System.err.println("arquivo nao encontrado com trackId, possivelmente o download falhou");
             return null;
 
@@ -205,14 +174,13 @@ public class SpotifyDownloader {
             if (process != null) {
                 process.destroyForcibly();
             }
-            Thread.currentThread().interrupt(); // Restaura flag de interrupção
+            Thread.currentThread().interrupt();
             return null;
         } catch (Exception e) {
             System.err.println("erro ao baixar musica: " + e.getMessage());
             e.printStackTrace();
             return null;
         } finally {
-            // Cleanup
             if (reader != null) {
                 try {
                     reader.close();
@@ -224,9 +192,6 @@ public class SpotifyDownloader {
         }
     }
 
-    /**
-     * Limpa arquivos antigos do diretório de downloads (mais de 6 meses)
-     */
     public void cleanupOldFiles() {
         try {
             File[] files = downloadDir.toFile().listFiles((dir, name) -> name.endsWith(".mp3"));
@@ -235,9 +200,8 @@ public class SpotifyDownloader {
                 int deleted = 0;
 
                 for (File file : files) {
-                    // Deleta arquivos com mais de 6 meses (180 dias)
                     long fileAge = now - file.lastModified();
-                    if (fileAge > 15552000000L) { // 180 dias em ms (180 * 24 * 60 * 60 * 1000)
+                    if (fileAge > 15552000000L) {
                         if (file.delete()) {
                             deleted++;
                         }
@@ -253,20 +217,16 @@ public class SpotifyDownloader {
         }
     }
 
-    /**
-     * Inicia timer de auto-limpeza que roda a cada 24 horas
-     */
     public void startAutoCleanup() {
         Timer cleanupTimer = new Timer("AutoCleanup", true);
 
-        // Roda a cada 24 horas (86400000 ms)
         cleanupTimer.scheduleAtFixedRate(new TimerTask() {
             @Override
             public void run() {
                 System.out.println("executando auto-limpeza...");
                 cleanupOldFiles();
             }
-        }, 0, 86400000); // Primeira execução imediata, depois a cada 24h
+        }, 0, 86400000);
 
         System.out.println("auto-limpeza iniciada (arquivos +180 dias serao removidos a cada 24h)");
     }
@@ -275,17 +235,12 @@ public class SpotifyDownloader {
         return downloadDir;
     }
 
-    /**
-     * Verifica se a música já foi baixada (cache)
-     * Usa o ID do Spotify como chave
-     */
+
     private String checkCache(String spotifyUrl) {
         try {
-            // Extrai o ID da track da URL
             String trackId = extractTrackId(spotifyUrl);
             if (trackId == null) return null;
 
-            // Procura arquivo que contenha o ID no nome
             File[] files = downloadDir.toFile().listFiles((dir, name) ->
                 name.endsWith(".mp3") && name.contains(trackId)
             );
@@ -300,13 +255,8 @@ public class SpotifyDownloader {
         }
     }
 
-    /**
-     * Extrai o ID da track do Spotify da URL
-     */
     private String extractTrackId(String url) {
         try {
-            // https://open.spotify.com/track/5C8h9PY9oTneqJihbn10NB?si=...
-            // ou https://open.spotify.com/intl-pt/track/5C8h9PY9oTneqJihbn10NB
             String[] parts = url.split("/track/");
             if (parts.length > 1) {
                 String idPart = parts[1].split("\\?")[0];
@@ -318,9 +268,6 @@ public class SpotifyDownloader {
         }
     }
 
-    /**
-     * Limpa TODOS os arquivos do diretório de downloads
-     */
     public void cleanupAllFiles() {
         try {
             File[] files = downloadDir.toFile().listFiles();

@@ -23,7 +23,6 @@ public class SpotifyService {
     private final SpotifyApi spotifyApi;
     private long tokenExpirationTime = 0;
 
-    // Padrões de URL do Spotify (suporta URLs internacionais como /intl-pt/, /intl-es/, etc)
     private static final Pattern SPOTIFY_TRACK_PATTERN = Pattern.compile("^https://open\\.spotify\\.com/(?:intl-[a-z]{2}/)?track/([a-zA-Z0-9]+)");
     private static final Pattern SPOTIFY_PLAYLIST_PATTERN = Pattern.compile("^https://open\\.spotify\\.com/(?:intl-[a-z]{2}/)?playlist/([a-zA-Z0-9]+)");
     private static final Pattern SPOTIFY_ALBUM_PATTERN = Pattern.compile("^https://open\\.spotify\\.com/(?:intl-[a-z]{2}/)?album/([a-zA-Z0-9]+)");
@@ -114,7 +113,6 @@ public class SpotifyService {
 
             System.out.println("📋 Buscando playlist: " + playlistId);
 
-            // Busca as tracks da playlist (máximo 100 por página)
             int offset = 0;
             Paging<PlaylistTrack> playlistTracks;
 

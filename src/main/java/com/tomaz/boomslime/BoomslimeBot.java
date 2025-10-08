@@ -17,17 +17,16 @@ public class BoomslimeBot {
             return;
         }
 
-        // Inicia auto-limpeza de arquivos antigos (24h)
         SpotifyDownloader.getInstance().startAutoCleanup();
 
         JDA jda = JDABuilder.createDefault(token)
-                .setActivity(Activity.listening("vozes da minha cabeca"))
+                .setActivity(Activity.customStatus("\uD83D\uDD30  Made by @toomazs"))
                 .enableIntents(
                         GatewayIntent.GUILD_MESSAGES,
                         GatewayIntent.GUILD_VOICE_STATES,
                         GatewayIntent.MESSAGE_CONTENT
                 )
-                .addEventListeners(new CommandManager()) // Registra nosso gerenciador de comandos
+                .addEventListeners(new CommandManager())
                 .build();
 
         jda.awaitReady();

@@ -32,14 +32,13 @@ public class CommandManager extends ListenerAdapter {
             AudioTrack currentTrack = player.getPlayingTrack();
 
             if (currentTrack == null) {
-                event.reply("tem nada tocando, chefe").setEphemeral(true).queue();
+                event.reply("There is no song playing now.").setEphemeral(true).queue();
                 return;
             }
 
             List<AudioTrack> queue = musicManager.getScheduler().getQueue();
             int page = Integer.parseInt(buttonId.substring(buttonId.lastIndexOf("_") + 1));
 
-            // Atualiza a mensagem com a nova página
             updateQueuePage(event, currentTrack, queue, page);
         }
     }
@@ -54,14 +53,13 @@ public class CommandManager extends ListenerAdapter {
 
         EmbedBuilder embed = new EmbedBuilder();
         embed.setColor(Color.MAGENTA);
-        embed.setTitle("\uD83C\uDFB5 - fila atual");
+        embed.setTitle("\uD83C\uDFB5  Actual queue");
 
-        // Música atual
         AudioTrackInfo info = currentTrack.getInfo();
         long position = currentTrack.getPosition();
         long duration = currentTrack.getDuration();
 
-        embed.addField("▶\uFE0F - ta tocando isso aq:",
+        embed.addField("▶\uFE0F  Currently playing:",
                 String.format("**%s** - **%s**\n[%s / %s]",
                         info.title,
                         info.author,
@@ -69,9 +67,8 @@ public class CommandManager extends ListenerAdapter {
                         formatTime(duration)),
                 false);
 
-        // Próximas músicas
         if (queue.isEmpty()) {
-            embed.addField("proximas a toca nessa porra:", "fila ta vazia chefe", false);
+            embed.addField("Song list:", "The queue is empty.", false);
         } else {
             StringBuilder queueString = new StringBuilder();
             int start = page * TRACKS_PER_PAGE;
@@ -86,11 +83,10 @@ public class CommandManager extends ListenerAdapter {
                         formatTime(track.getDuration())));
             }
 
-            embed.addField("proximas (" + queue.size() + ") - pagina " + (page + 1) + "/" + totalPages,
+            embed.addField("Next queue songs (" + queue.size() + ") - Page " + (page + 1) + "/" + totalPages,
                           queueString.toString(), false);
         }
 
-        // Botões de navegação
         net.dv8tion.jda.api.interactions.components.buttons.Button prevButton =
             net.dv8tion.jda.api.interactions.components.buttons.Button.secondary("queue_prev_" + (page - 1), "<<<")
                 .withDisabled(page == 0);
@@ -158,7 +154,6 @@ public class CommandManager extends ListenerAdapter {
                     handleHelpCommand(event);
                     break;
                 default:
-                    // Comando não reconhecido - não faz nada
                     break;
             }
         }
@@ -168,13 +163,12 @@ public class CommandManager extends ListenerAdapter {
         MessageChannel channel = event.getChannel();
 
         if (args.length < 2) {
-            channel.sendMessage("usa direito fdp burro: !play <url do spotify>").queue();
+            channel.sendMessage("> Correct use: !play <Spotify URL>").queue();
             return;
         }
 
-        // Verifica se o usuário está em um canal de voz
         if (event.getMember() == null || event.getMember().getVoiceState() == null || !event.getMember().getVoiceState().inAudioChannel()) {
-            channel.sendMessage("precisa ta em um canal de voz ne o imbecil").queue();
+            channel.sendMessage("> Please, join a voice channel before use this command.").queue();
             return;
         }
 
@@ -190,13 +184,12 @@ public class CommandManager extends ListenerAdapter {
         AudioTrack currentTrack = player.getPlayingTrack();
 
         if (currentTrack == null) {
-            channel.sendMessage("tem nada tocando, chefe").queue();
+            channel.sendMessage("> There is no song playing now.").queue();
             return;
         }
 
         List<AudioTrack> queue = musicManager.getScheduler().getQueue();
 
-        // Envia a primeira página (página 0)
         sendQueuePage(event, currentTrack, queue, 0);
     }
 
@@ -204,20 +197,19 @@ public class CommandManager extends ListenerAdapter {
         final int TRACKS_PER_PAGE = 10;
         int totalPages = (int) Math.ceil((double) queue.size() / TRACKS_PER_PAGE);
 
-        if (totalPages == 0) totalPages = 1; // Pelo menos 1 página
+        if (totalPages == 0) totalPages = 1;
         if (page < 0) page = 0;
         if (page >= totalPages) page = totalPages - 1;
 
         EmbedBuilder embed = new EmbedBuilder();
         embed.setColor(Color.MAGENTA);
-        embed.setTitle("\uD83C\uDFB5 - fila atual");
+        embed.setTitle("\uD83C\uDFB5  Actual queue");
 
-        // Música atual
         AudioTrackInfo info = currentTrack.getInfo();
         long position = currentTrack.getPosition();
         long duration = currentTrack.getDuration();
 
-        embed.addField("▶\uFE0F - ta tocando isso aq:",
+        embed.addField("Currently playing:",
                 String.format("**%s** - **%s**\n[%s / %s]",
                         info.title,
                         info.author,
@@ -225,9 +217,8 @@ public class CommandManager extends ListenerAdapter {
                         formatTime(duration)),
                 false);
 
-        // Próximas músicas
         if (queue.isEmpty()) {
-            embed.addField("proximas a toca nessa porra:", "fila ta vazia chefe", false);
+            embed.addField("Song list:", "The queue is empty.", false);
         } else {
             StringBuilder queueString = new StringBuilder();
             int start = page * TRACKS_PER_PAGE;
@@ -242,11 +233,10 @@ public class CommandManager extends ListenerAdapter {
                         formatTime(track.getDuration())));
             }
 
-            embed.addField("proximas (" + queue.size() + ") - pagina " + (page + 1) + "/" + totalPages,
+            embed.addField("Next queue songs (" + queue.size() + ") - Page " + (page + 1) + "/" + totalPages,
                           queueString.toString(), false);
         }
 
-        // Botões de navegação
         net.dv8tion.jda.api.interactions.components.buttons.Button prevButton =
             net.dv8tion.jda.api.interactions.components.buttons.Button.secondary("queue_prev_" + (page - 1), "<<<")
                 .withDisabled(page == 0);
@@ -264,7 +254,7 @@ public class CommandManager extends ListenerAdapter {
         MessageChannel channel = event.getChannel();
 
         if (!isUserInVoiceChannel(event)) {
-            channel.sendMessage("precisa ta numa call, seu fdp burro").queue();
+            channel.sendMessage("> Please, join a voice channel before use this command.").queue();
             return;
         }
 
@@ -272,20 +262,20 @@ public class CommandManager extends ListenerAdapter {
         AudioPlayer player = musicManager.getAudioPlayer();
 
         if (player.getPlayingTrack() == null) {
-            channel.sendMessage("tem nada tocando, chefe").queue();
+            channel.sendMessage("> There is no music playing now.").queue();
             return;
         }
 
         String trackName = player.getPlayingTrack().getInfo().title;
         musicManager.getScheduler().nextTrack();
-        channel.sendMessage("⏭ pulandinhooo >///<").queue();
+        channel.sendMessage("> ⏭ Skipping for the next song...").queue();
     }
 
     private void handleRewindCommand(MessageReceivedEvent event) {
         MessageChannel channel = event.getChannel();
 
         if (!isUserInVoiceChannel(event)) {
-            channel.sendMessage("entra em uma call antes seu inutil").queue();
+            channel.sendMessage("> Please, join a voice channel before use this command.").queue();
             return;
         }
 
@@ -294,9 +284,9 @@ public class CommandManager extends ListenerAdapter {
         boolean success = musicManager.getScheduler().rewind();
 
         if (success) {
-            channel.sendMessage("⏮ voltandinhooo >///<").queue();
+            channel.sendMessage("> ⏮ Going back to the previous song...").queue();
         } else {
-            channel.sendMessage("sem historico dog").queue();
+            channel.sendMessage("> No rewind history.").queue();
         }
     }
 
@@ -304,7 +294,7 @@ public class CommandManager extends ListenerAdapter {
         MessageChannel channel = event.getChannel();
 
         if (!isUserInVoiceChannel(event)) {
-            channel.sendMessage("crlh entra numa call primeiro porra").queue();
+            channel.sendMessage("> Please, join a voice channel before use this command.").queue();
             return;
         }
 
@@ -312,24 +302,24 @@ public class CommandManager extends ListenerAdapter {
         AudioPlayer player = musicManager.getAudioPlayer();
 
         if (player.getPlayingTrack() == null) {
-            channel.sendMessage("tem nada tocando, chefe").queue();
+            channel.sendMessage("> There is no song playing now.").queue();
             return;
         }
 
         if (player.isPaused()) {
-            channel.sendMessage("ja ta pausado fdp").queue();
+            channel.sendMessage("> This song is already paused.").queue();
             return;
         }
 
         player.setPaused(true);
-        channel.sendMessage("⏸ pausadinho >///<").queue();
+        channel.sendMessage("> ⏸ Pausing song...").queue();
     }
 
     private void handleResumeCommand(MessageReceivedEvent event) {
         MessageChannel channel = event.getChannel();
 
         if (!isUserInVoiceChannel(event)) {
-            channel.sendMessage("entra em uma call antes pfv inergumeno").queue();
+            channel.sendMessage("> Please, join a voice channel before use this command.").queue();
             return;
         }
 
@@ -337,40 +327,37 @@ public class CommandManager extends ListenerAdapter {
         AudioPlayer player = musicManager.getAudioPlayer();
 
         if (player.getPlayingTrack() == null) {
-            channel.sendMessage("tem nada tocando, chefe").queue();
+            channel.sendMessage("> There is no song playing now.").queue();
             return;
         }
 
         if (!player.isPaused()) {
-            channel.sendMessage("ja ta tocando msc o leproso").queue();
+            channel.sendMessage("> The music is already playing.").queue();
             return;
         }
 
         player.setPaused(false);
-        channel.sendMessage("▶ retomadinho >///<").queue();
+        channel.sendMessage("> ▶ Resuming the song...").queue();
     }
 
     private void handleStopCommand(MessageReceivedEvent event) {
         MessageChannel channel = event.getChannel();
 
         if (!isUserInVoiceChannel(event)) {
-            channel.sendMessage("precisa ta em call antes ne o idiota").queue();
+            channel.sendMessage("> Please, join a voice channel before use this command.").queue();
             return;
         }
 
         long guildId = event.getGuild().getIdLong();
 
-        // PRIORIDADE: Cancela TODOS os downloads em andamento
         com.tomaz.boomslime.music.DownloadManager.getInstance().cancelAllDownloads(guildId);
 
-        // Para o player e limpa a fila
         GuildMusicManager musicManager = PlayerManager.getInstance().getMusicManager(event.getGuild());
         musicManager.getScheduler().stop();
 
-        // Desconecta do canal de voz
         event.getGuild().getAudioManager().closeAudioConnection();
 
-        channel.sendMessage("■ paradinho >///<").queue();
+        channel.sendMessage("> ■ Stopping the song...").queue();
     }
 
     private void handleNowPlayingCommand(MessageReceivedEvent event) {
@@ -380,7 +367,7 @@ public class CommandManager extends ListenerAdapter {
         AudioTrack track = player.getPlayingTrack();
 
         if (track == null) {
-            channel.sendMessage("tem nada tocando, chefe").queue();
+            channel.sendMessage("> There is no song playing now.").queue();
             return;
         }
 
@@ -390,12 +377,11 @@ public class CommandManager extends ListenerAdapter {
 
         EmbedBuilder embed = new EmbedBuilder();
         embed.setColor(Color.MAGENTA);
-        embed.setTitle("▶\uFE0F - ta tocando isso aq:");
-        embed.addField("musica bosta:", info.title, false);
-        embed.addField("artista merda:", info.author, false);
-        embed.addField("progresso (deu mo trampo fazer a barra aq embaixo pprt):", formatTime(position) + " / " + formatTime(duration), false);
+        embed.setTitle("▶\uFE0F  Currently playing:");
+        embed.addField("Song:", info.title, false);
+        embed.addField("Artist:", info.author, false);
+        embed.addField("Progress:", formatTime(position) + " / " + formatTime(duration), false);
 
-        // Barra de progresso
         int progressBarLength = 20;
         int progress = (int) ((double) position / duration * progressBarLength);
         StringBuilder progressBar = new StringBuilder();
@@ -409,7 +395,7 @@ public class CommandManager extends ListenerAdapter {
         embed.addField("", progressBar.toString(), false);
 
         if (player.isPaused()) {
-            embed.setFooter("⏸ pausadinho >///<");
+            embed.setFooter("> ⏸ Paused.");
         }
 
         channel.sendMessageEmbeds(embed.build()).queue();
@@ -419,7 +405,7 @@ public class CommandManager extends ListenerAdapter {
         MessageChannel channel = event.getChannel();
 
         if (!isUserInVoiceChannel(event)) {
-            channel.sendMessage("precisa ta em canal de voz antes arrombado").queue();
+            channel.sendMessage("> Please, join a voice channel before use this command.").queue();
             return;
         }
 
@@ -427,12 +413,12 @@ public class CommandManager extends ListenerAdapter {
         List<AudioTrack> queue = musicManager.getScheduler().getQueue();
 
         if (queue.isEmpty()) {
-            channel.sendMessage("fila ta vazia chefe").queue();
+            channel.sendMessage("> The queue is empty.").queue();
             return;
         }
 
         musicManager.getScheduler().shuffle();
-        channel.sendMessage("fila embaralhada c sucesso igual a xexeuba da sua maekk, da um !queue ai").queue();
+        channel.sendMessage("> Queue shuffled successfully.").queue();
     }
 
     private void handleHelpCommand(MessageReceivedEvent event) {
@@ -441,23 +427,22 @@ public class CommandManager extends ListenerAdapter {
 
         EmbedBuilder embed = new EmbedBuilder();
         embed.setColor(Color.MAGENTA);
-        embed.setTitle("\uD83D\uDEAE - comandos desse bot horrivel:");
+        embed.setTitle("🆘  All commands:");
 
-        embed.addField(prefix + "play <url-spotify>", "toca musica ou playlist spotify (bruh)", false);
-        embed.addField(prefix + "queue", ",ostra a fila de músicas", false);
-        embed.addField(prefix + "skip", "pula a música atual", false);
-        embed.addField(prefix + "rewind", "volta para a música anterior", false);
-        embed.addField(prefix + "pause", "pausa a música atual", false);
-        embed.addField(prefix + "resume", "retoma a música pausada", false);
-        embed.addField(prefix + "shuffle", "embaralha a fila de músicas", false);
-        embed.addField(prefix + "stop", "para o player e limpa a fila", false);
-        embed.addField(prefix + "nowplaying", "mostra informações da música atual", false);
-        embed.addField(prefix + "help", "mostra essa mensagem de ajuda", false);
+        embed.addField(prefix + "play or !p <Spotify-URL>", "Play Spotify song or Spotify playlist", false);
+        embed.addField(prefix + "queue or !q", "Show the song queue", false);
+        embed.addField(prefix + "skip or !s", "Skip the current song", false);
+        embed.addField(prefix + "rewind or !prev or !previous", "Go back to the previous song", false);
+        embed.addField(prefix + "pause", "Pause the current song", false);
+        embed.addField(prefix + "resume or !unpause", "Resume the paused song", false);
+        embed.addField(prefix + "shuffle or !embaralhar", "Shuffle the song queue", false);
+        embed.addField(prefix + "stop", "Stops the player and clears the queue", false);
+        embed.addField(prefix + "nowplaying or !np", "Shows information of the current song", false);
+        embed.addField(prefix + "help or !ajuda", "Show this help menu", false);
 
         channel.sendMessageEmbeds(embed.build()).queue();
     }
 
-    // Métodos auxiliares
 
     private boolean isUrl(String input) {
         try {
