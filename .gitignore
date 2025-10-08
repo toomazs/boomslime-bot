@@ -47,3 +47,5 @@ build/
 ### Application Data ###
 data/
 *.mp3
+
+cookies.txt

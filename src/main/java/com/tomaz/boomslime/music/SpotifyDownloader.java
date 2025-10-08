@@ -101,6 +101,7 @@ public class SpotifyDownloader {
                         "--bitrate", "96k",
                         "--threads", "8",
                         "--output", outputPattern,
+                        "--cookie-file", "cookies.txt",
                         "--print-errors"
                 );
             } else {
@@ -113,6 +114,7 @@ public class SpotifyDownloader {
                         "--bitrate", "96k",
                         "--threads", "8",
                         "--output", outputPattern,
+                        "--cookie-file", "cookies.txt",
                         "--print-errors"
                 );
             }
