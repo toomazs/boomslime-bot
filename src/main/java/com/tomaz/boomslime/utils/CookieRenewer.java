@@ -269,10 +269,17 @@ public class CookieRenewer {
                     .setHeadless(true)
             );
 
-            context = browser.newContext(new Browser.NewContextOptions()
-                    .setStorageStatePath(renewer.persistentContextPath.resolve("state.json"))
-                    .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:122.0) Gecko/20100101 Firefox/122.0")
-            );
+            // Cria contexto (sem state.json no primeiro login)
+            Path statePath = renewer.persistentContextPath.resolve("state.json");
+            Browser.NewContextOptions contextOptions = new Browser.NewContextOptions()
+                    .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:122.0) Gecko/20100101 Firefox/122.0");
+
+            // Só usa storageState se arquivo já existir
+            if (Files.exists(statePath)) {
+                contextOptions.setStorageStatePath(statePath);
+            }
+
+            context = browser.newContext(contextOptions);
 
             Page page = context.newPage();
 
@@ -302,7 +309,11 @@ public class CookieRenewer {
             System.out.println("✅ login concluido!");
             System.out.println();
 
-            // Fecha navegador (salva sessão automaticamente)
+            // Salva a sessão no state.json
+            context.storageState(new BrowserContext.StorageStateOptions().setPath(statePath));
+            System.out.println("💾 sessao salva em: " + statePath);
+
+            // Fecha navegador
             context.close();
             browser.close();
             playwright.close();
