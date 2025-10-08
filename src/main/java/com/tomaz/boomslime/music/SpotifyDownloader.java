@@ -225,7 +225,7 @@ public class SpotifyDownloader {
     }
 
     /**
-     * Limpa arquivos antigos do diretório de downloads (mais de 24h)
+     * Limpa arquivos antigos do diretório de downloads (mais de 6 meses)
      */
     public void cleanupOldFiles() {
         try {
@@ -235,9 +235,9 @@ public class SpotifyDownloader {
                 int deleted = 0;
 
                 for (File file : files) {
-                    // Deleta arquivos com mais de 24 horas
+                    // Deleta arquivos com mais de 6 meses (180 dias)
                     long fileAge = now - file.lastModified();
-                    if (fileAge > 86400000) { // 24h em ms
+                    if (fileAge > 15552000000L) { // 180 dias em ms (180 * 24 * 60 * 60 * 1000)
                         if (file.delete()) {
                             deleted++;
                         }
@@ -245,7 +245,7 @@ public class SpotifyDownloader {
                 }
 
                 if (deleted > 0) {
-                    System.out.println("auto-limpeza: removeu " + deleted + " arquivos com +24h");
+                    System.out.println("auto-limpeza: removeu " + deleted + " arquivos com +180 dias");
                 }
             }
         } catch (Exception e) {
@@ -254,21 +254,21 @@ public class SpotifyDownloader {
     }
 
     /**
-     * Inicia timer de auto-limpeza que roda a cada 6 horas
+     * Inicia timer de auto-limpeza que roda a cada 24 horas
      */
     public void startAutoCleanup() {
         Timer cleanupTimer = new Timer("AutoCleanup", true);
 
-        // Roda a cada 6 horas (21600000 ms)
+        // Roda a cada 24 horas (86400000 ms)
         cleanupTimer.scheduleAtFixedRate(new TimerTask() {
             @Override
             public void run() {
                 System.out.println("executando auto-limpeza...");
                 cleanupOldFiles();
             }
-        }, 0, 21600000); // Primeira execução imediata, depois a cada 6h
+        }, 0, 86400000); // Primeira execução imediata, depois a cada 24h
 
-        System.out.println("auto-limpeza iniciada (arquivos +24h serao removidos a cada 6h)");
+        System.out.println("auto-limpeza iniciada (arquivos +180 dias serao removidos a cada 24h)");
     }
 
     public Path getDownloadDir() {
